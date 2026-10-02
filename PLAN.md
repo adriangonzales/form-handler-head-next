@@ -187,7 +187,7 @@ Cross-cutting: toasts on every mutation, shared confirm dialog, `error.tsx` / `n
 
 ## 7. Milestones
 
-0. **Contract & docs.** Copy the Nuxt PRDs into `docs/prds/`, replacing Nuxt mechanisms with the Next.js ones in §4–6 and "Laravel API" with "The Backend". Write `docs/backend-contract.md` from §2 — the checklist a replacement backend must meet.
+0. ✅ **Contract & docs** (done 2026-10-02). [`docs/prds/`](docs/prds/README.md) adapts the Nuxt PRDs: Next.js mechanisms, "The Backend" instead of Laravel, and the Nuxt build's lessons written into the requirements (flagged "Lesson from Nuxt"). [`docs/backend-contract.md`](docs/backend-contract.md) is the checklist a replacement backend must meet. Writing it found two harmless spec inaccuracies: create endpoints documented as 200 but returning 201, and schema `rules` documented as array-only. It also found that entry updates are documented as `PUT` only, so this dashboard uses `PUT` (the Nuxt one sends `PATCH`).
 1. **Scaffold.** Next.js + TS strict, Tailwind 4, shadcn/ui init, ESLint/Prettier, Vitest, Playwright, MSW. `api:types` script, `types/models.ts` aliases (and `FormListItem`) with type tests. `.env.example`, `pnpm check`.
 2. **Backend boundary, auth and BFF.** `lib/backend/*`, iron-session, Redis refresh coordinator (Redis added to the local dev setup), `proxy.ts`, `/api/backend/[...path]`, auth route handlers, login/forgot/reset pages, dashboard layout, placeholder pages. Unit tests for token timing, coordinator and proxy path rules; e2e for login, logout, refresh, expiry.
 3. **Forms.** List, create (templates), header/tabs, settings, activate, duplicate, delete/Undo. `useListQuery` and `DataTable` built here for reuse.
