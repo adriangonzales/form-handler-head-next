@@ -44,6 +44,13 @@ describe('parseServerEnv', () => {
     )
   })
 
+  it('treats empty variables as unset', () => {
+    const env = parseServerEnv({ ...valid, REDIS_URL: '', AUTH_REFRESH_AHEAD_SECONDS: '' })
+
+    expect(env.REDIS_URL).toBeUndefined()
+    expect(env.AUTH_REFRESH_AHEAD_SECONDS).toBe(120)
+  })
+
   it('requires Redis in production only', () => {
     expect(() => parseServerEnv({ ...valid, NODE_ENV: 'production' })).toThrow(
       'REDIS_URL: is required in production',

@@ -1,6 +1,6 @@
 # PRD: App Shell & Architecture
 
-**Status:** Partly built. Milestone 1 (2026-10-02): configuration (FR-1), generated types (FR-2), tooling, and the contract suite's first checks (FR-15). Planned: the backend boundary and proxy, layout and shared UI (milestone 2), polish (9), and the mock-backend run (10) · **Owner area:** `next.config.ts`, `proxy.ts`, `lib/backend/*`, `lib/api-client.ts`, `lib/query-keys.ts`, `lib/form-errors.ts`, `app/api/backend/[...path]/route.ts`, `app/(dashboard)/layout.tsx`, `app/(auth)/layout.tsx`, `app/error.tsx`, `app/not-found.tsx`, `app/global-error.tsx`, `components/shared/*`, `types/*`, `scripts/generate-api-types.mjs`, `tests/mocks/*`, `tests/contract/*`
+**Status:** Partly built. Milestone 1 (2026-10-02): configuration (FR-1), generated types (FR-2), tooling. Milestone 2 (2026-10-02): the backend boundary (FR-3), proxy (FR-4, FR-5), layouts and navigation (FR-7), validation errors (FR-12), basic error pages (FR-13), and the mock backend's auth endpoints with the contract suite passing against it (FR-15). Planned: TanStack Query data fetching (FR-6, milestone 3), form tabs (FR-8), toasts and confirmation (FR-10, FR-11), the 403 page (FR-13), polish (9), and the full mock-backend run (10)
 
 ## 1. Summary
 
@@ -33,7 +33,7 @@ This PRD covers the foundation every feature builds on:
 - The server reads `BACKEND_API_URL` (The Backend's API base, server-only), `BACKEND_REFRESH_WINDOW_SECONDS`, `AUTH_REFRESH_AHEAD_SECONDS`, `SESSION_SECRET` and `REDIS_URL` from the environment. The browser gets `NEXT_PUBLIC_BACKEND_PUBLIC_URL` (the base shown in embed snippets and used by the test-submit tool) and `NEXT_PUBLIC_PASSWORD_REQUIREMENTS`.
 - Server-only values are read at request time through one typed, zod-validated `lib/env.ts`, so a production build can be configured at runtime. The app fails to start with a clear message if a required value is missing or malformed (for example `SESSION_SECRET` under 32 characters).
 - `NEXT_PUBLIC_*` values are inlined at build time, as Next.js requires. The README says so, because changing them needs a rebuild.
-- `.env.example` documents every variable, including the test-only ones (`E2E_EMAIL`, `E2E_PASSWORD`, `E2E_CREATE_USER_CMD`).
+- `.env.example` documents every variable, including the test-only ones (`E2E_CREATE_USER_CMD`, `E2E_PORT`).
 - No variable is named after a backend framework.
 
 **FR-2 Generated API types.**
@@ -53,7 +53,7 @@ This PRD covers the foundation every feature builds on:
 
 **FR-4 Authenticated API proxy.**
 
-- `app/api/backend/[...path]/route.ts` forwards any `/api/backend/**` request (method, query, JSON body) to `{BACKEND_API_URL}/**` with `Authorization: Bearer` taken from the session.
+- `app/api/backend/[...path]/route.ts` forwards any `/api/backend/**` request (method, query, JSON body) to `{BACKEND_API_URL}/v1/**` with `Authorization: Bearer` taken from the session. The API version lives here only, so client code calls `/api/backend/forms`, not `/api/backend/v1/forms`.
 - It returns The Backend's status code and JSON body unchanged, so 401/403/404/409/410/422/429 reach the page as The Backend sent them, along with `Retry-After`.
 - Token refresh and session expiry rules are in [Authentication & Session](authentication-and-session.md) FR-5 and FR-6.
 - Requests without a session get 401 without calling The Backend.

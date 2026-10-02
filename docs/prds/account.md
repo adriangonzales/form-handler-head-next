@@ -44,7 +44,7 @@ The **Account** page lets a signed-in user update their name and email, change t
   - their exports.
 - It says the deletion is permanent.
 - **Delete account** opens a confirmation dialog that asks for the current password. The confirm button stays disabled until the user types their email.
-- The browser sends the password in the body of `DELETE /api/auth/me`. The route handler calls `DELETE /v1/auth/me?password=…`, as the contract requires. On 204 it destroys the session and the user lands on `/login?deleted=1` with "Your account has been deleted."
+- The browser sends the password in the body of `DELETE /api/auth/me`. The route handler calls `DELETE /v1/auth/me?password=…`, as the contract requires. On 204 it destroys the session and the user lands on `/login?reason=deleted` with "Your account has been deleted."
 - A wrong password shows a 422 on the password field, and nothing is deleted.
 
 ## 5. Non-functional requirements

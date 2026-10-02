@@ -7,6 +7,12 @@ export default defineConfig([
   ...nextVitals,
   ...nextTs,
   prettier,
+  {
+    rules: {
+      // `const { secret, ...rest } = value` is how a key is left out of an object.
+      '@typescript-eslint/no-unused-vars': ['warn', { ignoreRestSiblings: true }],
+    },
+  },
   globalIgnores([
     '.next/**',
     'out/**',

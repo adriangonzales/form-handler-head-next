@@ -84,7 +84,7 @@ The behaviour is the same. These are the mechanisms that differ, and why.
 | --------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------- |
 | PRDs and backend contract                                                                     | Written (milestone 0, 2026-10-02)                                                     |
 | Project scaffold, config from `.env`, generated API types, lint/format/typecheck/test tooling | Built (milestone 1, 2026-10-02)                                                       |
-| Backend boundary, login, session, token refresh, route protection, password reset             | Planned (milestone 2)                                                                 |
+| Backend boundary, login, session, token refresh, route protection, password reset             | Built (milestone 2, 2026-10-02)                                                       |
 | Form management                                                                               | Planned (milestone 3)                                                                 |
 | Schema builder, embed snippets, test submit                                                   | Planned (milestone 4)                                                                 |
 | Entry inbox and triage                                                                        | Planned (milestone 5)                                                                 |

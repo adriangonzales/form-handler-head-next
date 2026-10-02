@@ -37,6 +37,8 @@ Every variable is documented in [`.env.example`](.env.example).
 | Command              | What it does                                                                      |
 | -------------------- | --------------------------------------------------------------------------------- |
 | `pnpm dev`           | Development server                                                                |
+| `pnpm dev:mock`      | Development server against the mock backend (no Backend or Redis needed)          |
+| `pnpm mock:backend`  | Just the mock backend, on `127.0.0.1:8010`                                        |
 | `pnpm build`         | Production build                                                                  |
 | `pnpm start`         | Serve the production build                                                        |
 | `pnpm check`         | Lint, Prettier check, typecheck, unit and component tests (run before committing) |
@@ -57,7 +59,20 @@ The checks that sign in need test users, and the contract has no sign-up endpoin
 E2E_CREATE_USER_CMD="cd ../form-handler-headless-laravel && php artisan user:create --name={name} --email={email} --password={password} --no-interaction"
 ```
 
-Tests delete these users afterwards through the API.
+`.env.example` has the equivalent for the mock backend. Tests delete their users afterwards through the API.
+
+`pnpm test:e2e` starts its own dev server on port 3100 (`E2E_PORT`), with the token refreshed on every request, so the refresh path is always exercised. It creates its own user for the run.
+
+The Redis tests in `tests/unit/redis-refresh-store.test.ts` run when `REDIS_URL` is set (`pnpm services:up`), and are skipped otherwise.
+
+## The mock backend
+
+`tests/mocks/backend/` is an in-memory implementation of [the contract](docs/backend-contract.md), built with MSW. It grows with each feature. `pnpm dev:mock` runs the dashboard against it; sign in as `demo@example.com` / `password`. To check the dashboard and the contract suite against it:
+
+```sh
+pnpm mock:backend
+BACKEND_API_URL=http://127.0.0.1:8010/api pnpm test:contract
+```
 
 ## Project layout
 

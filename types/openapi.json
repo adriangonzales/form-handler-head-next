@@ -1,0 +1,3567 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Headless Form Handler",
+    "version": "0.0.1"
+  },
+  "servers": [
+    {
+      "url": "http://127.0.0.1:8001/api"
+    }
+  ],
+  "security": [
+    {
+      "http": []
+    }
+  ],
+  "paths": {
+    "/v1/auth/me": {
+      "patch": {
+        "operationId": "auth.me.update",
+        "summary": "Update the authenticated user's name or email. Changing the email clears its verification",
+        "tags": [
+          "Account"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateProfileRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "`UserResource`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/UserResource"
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/AuthenticationException"
+          },
+          "422": {
+            "$ref": "#/components/responses/ValidationException"
+          }
+        }
+      },
+      "delete": {
+        "operationId": "auth.me.destroy",
+        "summary": "Permanently delete the account and everything it owns",
+        "tags": [
+          "Account"
+        ],
+        "parameters": [
+          {
+            "name": "password",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No content"
+          },
+          "401": {
+            "$ref": "#/components/responses/AuthenticationException"
+          },
+          "422": {
+            "$ref": "#/components/responses/ValidationException"
+          }
+        }
+      },
+      "get": {
+        "operationId": "auth.me",
+        "summary": "Get the authenticated user",
+        "tags": [
+          "Auth"
+        ],
+        "responses": {
+          "200": {
+            "description": "`UserResource`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/UserResource"
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/AuthenticationException"
+          }
+        }
+      }
+    },
+    "/v1/auth/password": {
+      "put": {
+        "operationId": "auth.password.update",
+        "summary": "Change the password, revoke every existing token, and return a new one for this client",
+        "tags": [
+          "Account"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdatePasswordRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "access_token": {
+                      "type": "string"
+                    },
+                    "token_type": {
+                      "type": "string",
+                      "const": "bearer"
+                    },
+                    "expires_in": {
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "access_token",
+                    "token_type",
+                    "expires_in"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/AuthenticationException"
+          },
+          "422": {
+            "$ref": "#/components/responses/ValidationException"
+          }
+        }
+      }
+    },
+    "/v1/auth/login": {
+      "post": {
+        "operationId": "auth.login",
+        "summary": "Exchange an email and password for an access token",
+        "tags": [
+          "Auth"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoginRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "access_token": {
+                      "type": "string"
+                    },
+                    "token_type": {
+                      "type": "string",
+                      "const": "bearer"
+                    },
+                    "expires_in": {
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "access_token",
+                    "token_type",
+                    "expires_in"
+                  ]
+                }
+              }
+            }
+          },
+          "422": {
+            "$ref": "#/components/responses/ValidationException"
+          }
+        },
+        "security": []
+      }
+    },
+    "/v1/auth/refresh": {
+      "post": {
+        "operationId": "auth.refresh",
+        "description": "The old token is blacklisted. Refreshing is allowed until the\ntoken is older than the configured refresh TTL, and never for a\ntoken revoked by a password change or reset: the new token keeps\nthe original token version, so it is checked against revocation.",
+        "summary": "Exchange a current or recently expired token for a new one",
+        "tags": [
+          "Auth"
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "access_token": {
+                      "type": "string"
+                    },
+                    "token_type": {
+                      "type": "string",
+                      "const": "bearer"
+                    },
+                    "expires_in": {
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "access_token",
+                    "token_type",
+                    "expires_in"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/AuthenticationException"
+          }
+        },
+        "security": []
+      }
+    },
+    "/v1/auth/logout": {
+      "post": {
+        "operationId": "auth.logout",
+        "summary": "Invalidate the current token",
+        "tags": [
+          "Auth"
+        ],
+        "responses": {
+          "204": {
+            "description": "No content"
+          },
+          "401": {
+            "$ref": "#/components/responses/AuthenticationException"
+          }
+        }
+      }
+    },
+    "/v1/forms": {
+      "get": {
+        "operationId": "forms.index",
+        "tags": [
+          "Form"
+        ],
+        "parameters": [
+          {
+            "name": "per_page",
+            "in": "query",
+            "description": "Results per page, from 1 to 100. Defaults to 15.",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100
+            }
+          },
+          {
+            "name": "sort",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "created_at",
+                "-created_at",
+                "updated_at",
+                "-updated_at",
+                "name",
+                "-name"
+              ]
+            }
+          },
+          {
+            "name": "filter[active]",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "true",
+                "false",
+                "1",
+                "0"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Paginated set of `FormResource`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/FormCollection"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "links": {
+                          "type": "object",
+                          "properties": {
+                            "first": {
+                              "type": [
+                                "string",
+                                "null"
+                              ]
+                            },
+                            "last": {
+                              "type": [
+                                "string",
+                                "null"
+                              ]
+                            },
+                            "prev": {
+                              "type": [
+                                "string",
+                                "null"
+                              ]
+                            },
+                            "next": {
+                              "type": [
+                                "string",
+                                "null"
+                              ]
+                            }
+                          },
+                          "required": [
+                            "first",
+                            "last",
+                            "prev",
+                            "next"
+                          ]
+                        },
+                        "meta": {
+                          "type": "object",
+                          "properties": {
+                            "current_page": {
+                              "type": "integer",
+                              "minimum": 1
+                            },
+                            "from": {
+                              "type": [
+                                "integer",
+                                "null"
+                              ],
+                              "minimum": 1
+                            },
+                            "last_page": {
+                              "type": "integer",
+                              "minimum": 1
+                            },
+                            "links": {
+                              "type": "array",
+                              "description": "Generated paginator links.",
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "url": {
+                                    "type": [
+                                      "string",
+                                      "null"
+                                    ]
+                                  },
+                                  "label": {
+                                    "type": "string"
+                                  },
+                                  "active": {
+                                    "type": "boolean"
+                                  }
+                                },
+                                "required": [
+                                  "url",
+                                  "label",
+                                  "active"
+                                ]
+                              }
+                            },
+                            "path": {
+                              "type": [
+                                "string",
+                                "null"
+                              ],
+                              "description": "Base path for paginator generated URLs."
+                            },
+                            "per_page": {
+                              "type": "integer",
+                              "description": "Number of items shown per page.",
+                              "minimum": 0
+                            },
+                            "to": {
+                              "type": [
+                                "integer",
+                                "null"
+                              ],
+                              "description": "Number of the last item in the slice.",
+                              "minimum": 1
+                            },
+                            "total": {
+                              "type": "integer",
+                              "description": "Total number of items being paginated.",
+                              "minimum": 0
+                            }
+                          },
+                          "required": [
+                            "current_page",
+                            "from",
+                            "last_page",
+                            "links",
+                            "path",
+                            "per_page",
+                            "to",
+                            "total"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "links",
+                        "meta"
+                      ]
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/AuthenticationException"
+          },
+          "422": {
+            "$ref": "#/components/responses/ValidationException"
+          }
+        }
+      },
+      "post": {
+        "operationId": "forms.store",
+        "tags": [
+          "Form"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FormStoreRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "`FormResource`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/FormResource"
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/AuthenticationException"
+          },
+          "422": {
+            "$ref": "#/components/responses/ValidationException"
+          }
+        }
+      }
+    },
+    "/v1/forms/{form}": {
+      "get": {
+        "operationId": "forms.show",
+        "tags": [
+          "Form"
+        ],
+        "parameters": [
+          {
+            "name": "form",
+            "in": "path",
+            "required": true,
+            "description": "The form ID",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "`FormResource`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/FormResource"
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/AuthenticationException"
+          },
+          "403": {
+            "$ref": "#/components/responses/AuthorizationException"
+          },
+          "404": {
+            "$ref": "#/components/responses/ModelNotFoundException"
+          }
+        }
+      },
+      "put": {
+        "operationId": "forms.update",
+        "tags": [
+          "Form"
+        ],
+        "parameters": [
+          {
+            "name": "form",
+            "in": "path",
+            "required": true,
+            "description": "The form ID",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FormUpdateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "`FormResource`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/FormResource"
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/AuthenticationException"
+          },
+          "403": {
+            "$ref": "#/components/responses/AuthorizationException"
+          },
+          "404": {
+            "$ref": "#/components/responses/ModelNotFoundException"
+          },
+          "422": {
+            "$ref": "#/components/responses/ValidationException"
+          }
+        }
+      },
+      "delete": {
+        "operationId": "forms.destroy",
+        "tags": [
+          "Form"
+        ],
+        "parameters": [
+          {
+            "name": "form",
+            "in": "path",
+            "required": true,
+            "description": "The form ID",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No content"
+          },
+          "401": {
+            "$ref": "#/components/responses/AuthenticationException"
+          },
+          "403": {
+            "$ref": "#/components/responses/AuthorizationException"
+          },
+          "404": {
+            "$ref": "#/components/responses/ModelNotFoundException"
+          }
+        }
+      }
+    },
+    "/v1/forms/{form}/restore": {
+      "post": {
+        "operationId": "forms.restore",
+        "tags": [
+          "Form"
+        ],
+        "parameters": [
+          {
+            "name": "form",
+            "in": "path",
+            "required": true,
+            "description": "The form ID",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "`FormResource`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/FormResource"
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/AuthenticationException"
+          },
+          "403": {
+            "$ref": "#/components/responses/AuthorizationException"
+          },
+          "404": {
+            "$ref": "#/components/responses/ModelNotFoundException"
+          }
+        }
+      }
+    },
+    "/v1/forms/{form}/duplicate": {
+      "post": {
+        "operationId": "forms.duplicate",
+        "summary": "Copy a form's name, schema, and settings into a new, inactive form",
+        "tags": [
+          "Form"
+        ],
+        "parameters": [
+          {
+            "name": "form",
+            "in": "path",
+            "required": true,
+            "description": "The form ID",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "`FormResource`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/FormResource"
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/AuthenticationException"
+          },
+          "403": {
+            "$ref": "#/components/responses/AuthorizationException"
+          },
+          "404": {
+            "$ref": "#/components/responses/ModelNotFoundException"
+          }
+        }
+      }
+    },
+    "/v1/forms/{form}/entries/bulk": {
+      "post": {
+        "operationId": "forms.entries.bulk",
+        "tags": [
+          "FormEntry"
+        ],
+        "parameters": [
+          {
+            "name": "form",
+            "in": "path",
+            "required": true,
+            "description": "The form ID",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FormEntryBulkRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "action": {},
+                        "affected": {
+                          "anyOf": [
+                            {
+                              "type": "integer",
+                              "minimum": 0
+                            },
+                            {
+                              "type": "integer"
+                            }
+                          ]
+                        }
+                      },
+                      "required": [
+                        "action",
+                        "affected"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/AuthenticationException"
+          },
+          "403": {
+            "$ref": "#/components/responses/AuthorizationException"
+          },
+          "404": {
+            "$ref": "#/components/responses/ModelNotFoundException"
+          },
+          "422": {
+            "$ref": "#/components/responses/ValidationException"
+          }
+        }
+      }
+    },
+    "/v1/forms/{form}/entries": {
+      "get": {
+        "operationId": "forms.entries.index",
+        "tags": [
+          "FormEntry"
+        ],
+        "parameters": [
+          {
+            "name": "form",
+            "in": "path",
+            "required": true,
+            "description": "The form ID",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "per_page",
+            "in": "query",
+            "description": "Results per page, from 1 to 100. Defaults to 15. Ignored when requesting an export.",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100
+            }
+          },
+          {
+            "name": "sort",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "created_at",
+                "-created_at",
+                "spam_score",
+                "-spam_score"
+              ]
+            }
+          },
+          {
+            "name": "filter[read]",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "true",
+                "false",
+                "1",
+                "0"
+              ]
+            }
+          },
+          {
+            "name": "filter[starred]",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "true",
+                "false",
+                "1",
+                "0"
+              ]
+            }
+          },
+          {
+            "name": "filter[spam]",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "true",
+                "false",
+                "1",
+                "0"
+              ]
+            }
+          },
+          {
+            "name": "filter[created_from]",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "name": "filter[created_to]",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "name": "filter[trashed]",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "with",
+                "only"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Paginated set of `FormEntryResource`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/FormEntryCollection"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "links": {
+                          "type": "object",
+                          "properties": {
+                            "first": {
+                              "type": [
+                                "string",
+                                "null"
+                              ]
+                            },
+                            "last": {
+                              "type": [
+                                "string",
+                                "null"
+                              ]
+                            },
+                            "prev": {
+                              "type": [
+                                "string",
+                                "null"
+                              ]
+                            },
+                            "next": {
+                              "type": [
+                                "string",
+                                "null"
+                              ]
+                            }
+                          },
+                          "required": [
+                            "first",
+                            "last",
+                            "prev",
+                            "next"
+                          ]
+                        },
+                        "meta": {
+                          "type": "object",
+                          "properties": {
+                            "current_page": {
+                              "type": "integer",
+                              "minimum": 1
+                            },
+                            "from": {
+                              "type": [
+                                "integer",
+                                "null"
+                              ],
+                              "minimum": 1
+                            },
+                            "last_page": {
+                              "type": "integer",
+                              "minimum": 1
+                            },
+                            "links": {
+                              "type": "array",
+                              "description": "Generated paginator links.",
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "url": {
+                                    "type": [
+                                      "string",
+                                      "null"
+                                    ]
+                                  },
+                                  "label": {
+                                    "type": "string"
+                                  },
+                                  "active": {
+                                    "type": "boolean"
+                                  }
+                                },
+                                "required": [
+                                  "url",
+                                  "label",
+                                  "active"
+                                ]
+                              }
+                            },
+                            "path": {
+                              "type": [
+                                "string",
+                                "null"
+                              ],
+                              "description": "Base path for paginator generated URLs."
+                            },
+                            "per_page": {
+                              "type": "integer",
+                              "description": "Number of items shown per page.",
+                              "minimum": 0
+                            },
+                            "to": {
+                              "type": [
+                                "integer",
+                                "null"
+                              ],
+                              "description": "Number of the last item in the slice.",
+                              "minimum": 1
+                            },
+                            "total": {
+                              "type": "integer",
+                              "description": "Total number of items being paginated.",
+                              "minimum": 0
+                            }
+                          },
+                          "required": [
+                            "current_page",
+                            "from",
+                            "last_page",
+                            "links",
+                            "path",
+                            "per_page",
+                            "to",
+                            "total"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "links",
+                        "meta"
+                      ]
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/AuthenticationException"
+          },
+          "403": {
+            "$ref": "#/components/responses/AuthorizationException"
+          },
+          "404": {
+            "$ref": "#/components/responses/ModelNotFoundException"
+          },
+          "422": {
+            "$ref": "#/components/responses/ValidationException"
+          }
+        }
+      },
+      "post": {
+        "operationId": "forms.entries.store",
+        "tags": [
+          "FormEntry"
+        ],
+        "parameters": [
+          {
+            "name": "form",
+            "in": "path",
+            "required": true,
+            "description": "The form ID",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "`FormEntryResource`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/FormEntryResource"
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/AuthenticationException"
+          },
+          "403": {
+            "$ref": "#/components/responses/AuthorizationException"
+          },
+          "404": {
+            "$ref": "#/components/responses/ModelNotFoundException"
+          },
+          "422": {
+            "$ref": "#/components/responses/ValidationException"
+          }
+        }
+      }
+    },
+    "/v1/entries/{entry}": {
+      "get": {
+        "operationId": "entries.show",
+        "tags": [
+          "FormEntry"
+        ],
+        "parameters": [
+          {
+            "name": "entry",
+            "in": "path",
+            "required": true,
+            "description": "The entry ID",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "`FormEntryResource`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/FormEntryResource"
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/AuthenticationException"
+          },
+          "403": {
+            "$ref": "#/components/responses/AuthorizationException"
+          },
+          "404": {
+            "$ref": "#/components/responses/ModelNotFoundException"
+          }
+        }
+      },
+      "put": {
+        "operationId": "entries.update",
+        "tags": [
+          "FormEntry"
+        ],
+        "parameters": [
+          {
+            "name": "entry",
+            "in": "path",
+            "required": true,
+            "description": "The entry ID",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FormEntryUpdateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "`FormEntryResource`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/FormEntryResource"
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/AuthenticationException"
+          },
+          "403": {
+            "$ref": "#/components/responses/AuthorizationException"
+          },
+          "404": {
+            "$ref": "#/components/responses/ModelNotFoundException"
+          },
+          "422": {
+            "$ref": "#/components/responses/ValidationException"
+          }
+        }
+      },
+      "delete": {
+        "operationId": "entries.destroy",
+        "tags": [
+          "FormEntry"
+        ],
+        "parameters": [
+          {
+            "name": "entry",
+            "in": "path",
+            "required": true,
+            "description": "The entry ID",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No content"
+          },
+          "401": {
+            "$ref": "#/components/responses/AuthenticationException"
+          },
+          "403": {
+            "$ref": "#/components/responses/AuthorizationException"
+          },
+          "404": {
+            "$ref": "#/components/responses/ModelNotFoundException"
+          }
+        }
+      }
+    },
+    "/v1/entries/{entry}/restore": {
+      "post": {
+        "operationId": "entries.restore",
+        "tags": [
+          "FormEntry"
+        ],
+        "parameters": [
+          {
+            "name": "entry",
+            "in": "path",
+            "required": true,
+            "description": "The entry ID",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "`FormEntryResource`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/FormEntryResource"
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/AuthenticationException"
+          },
+          "403": {
+            "$ref": "#/components/responses/AuthorizationException"
+          },
+          "404": {
+            "$ref": "#/components/responses/ModelNotFoundException"
+          }
+        }
+      }
+    },
+    "/v1/entries/{entry}/force": {
+      "delete": {
+        "operationId": "entries.force-destroy",
+        "tags": [
+          "FormEntry"
+        ],
+        "parameters": [
+          {
+            "name": "entry",
+            "in": "path",
+            "required": true,
+            "description": "The entry ID",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No content"
+          },
+          "401": {
+            "$ref": "#/components/responses/AuthenticationException"
+          },
+          "403": {
+            "$ref": "#/components/responses/AuthorizationException"
+          },
+          "404": {
+            "$ref": "#/components/responses/ModelNotFoundException"
+          }
+        }
+      }
+    },
+    "/v1/entry-exports/{export}/download": {
+      "get": {
+        "operationId": "entry-exports.download",
+        "description": "Reached through the temporary signed `download_url` from an export response, not the API token:\nthe signature shows the link was issued to a user allowed to view the export. A missing, altered\nor expired signature returns 403.",
+        "summary": "Download a completed export's CSV",
+        "tags": [
+          "FormEntryExport"
+        ],
+        "parameters": [
+          {
+            "name": "export",
+            "in": "path",
+            "required": true,
+            "description": "The export ID",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "text/csv; charset=UTF-8": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            },
+            "headers": {
+              "Transfer-Encoding": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "enum": [
+                    "chunked"
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing, invalid or expired signature",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "examples": [
+                    {
+                      "message": "Invalid signature."
+                    }
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "message"
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "$ref": "#/components/responses/ModelNotFoundException"
+          },
+          "409": {
+            "description": "An error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "Error overview.",
+                      "examples": [
+                        "This export is not ready."
+                      ]
+                    }
+                  },
+                  "required": [
+                    "message"
+                  ]
+                }
+              }
+            }
+          },
+          "410": {
+            "description": "An error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "Error overview.",
+                      "examples": [
+                        "This export has expired."
+                      ]
+                    }
+                  },
+                  "required": [
+                    "message"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "security": []
+      }
+    },
+    "/v1/forms/{form}/entries/exports": {
+      "post": {
+        "operationId": "forms.entries.exports.store",
+        "summary": "Queue a CSV export of the form's entries, using the same filters and sort as the entry index",
+        "tags": [
+          "FormEntryExport"
+        ],
+        "parameters": [
+          {
+            "name": "form",
+            "in": "path",
+            "required": true,
+            "description": "The form ID",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FormEntryIndexRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "`FormEntryExportResource`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/FormEntryExportResource"
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/AuthenticationException"
+          },
+          "403": {
+            "$ref": "#/components/responses/AuthorizationException"
+          },
+          "404": {
+            "$ref": "#/components/responses/ModelNotFoundException"
+          },
+          "422": {
+            "$ref": "#/components/responses/ValidationException"
+          }
+        }
+      }
+    },
+    "/v1/entry-exports": {
+      "get": {
+        "operationId": "entry-exports.index",
+        "description": "Exports past their `expires_at` are left out, as are exports of deleted forms.",
+        "summary": "List the exports of the user's forms, newest first, with their status",
+        "tags": [
+          "FormEntryExport"
+        ],
+        "parameters": [
+          {
+            "name": "per_page",
+            "in": "query",
+            "description": "Results per page, from 1 to 100. Defaults to 15.",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Paginated set of `FormEntryExportResource`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/FormEntryExportCollection"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "links": {
+                          "type": "object",
+                          "properties": {
+                            "first": {
+                              "type": [
+                                "string",
+                                "null"
+                              ]
+                            },
+                            "last": {
+                              "type": [
+                                "string",
+                                "null"
+                              ]
+                            },
+                            "prev": {
+                              "type": [
+                                "string",
+                                "null"
+                              ]
+                            },
+                            "next": {
+                              "type": [
+                                "string",
+                                "null"
+                              ]
+                            }
+                          },
+                          "required": [
+                            "first",
+                            "last",
+                            "prev",
+                            "next"
+                          ]
+                        },
+                        "meta": {
+                          "type": "object",
+                          "properties": {
+                            "current_page": {
+                              "type": "integer",
+                              "minimum": 1
+                            },
+                            "from": {
+                              "type": [
+                                "integer",
+                                "null"
+                              ],
+                              "minimum": 1
+                            },
+                            "last_page": {
+                              "type": "integer",
+                              "minimum": 1
+                            },
+                            "links": {
+                              "type": "array",
+                              "description": "Generated paginator links.",
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "url": {
+                                    "type": [
+                                      "string",
+                                      "null"
+                                    ]
+                                  },
+                                  "label": {
+                                    "type": "string"
+                                  },
+                                  "active": {
+                                    "type": "boolean"
+                                  }
+                                },
+                                "required": [
+                                  "url",
+                                  "label",
+                                  "active"
+                                ]
+                              }
+                            },
+                            "path": {
+                              "type": [
+                                "string",
+                                "null"
+                              ],
+                              "description": "Base path for paginator generated URLs."
+                            },
+                            "per_page": {
+                              "type": "integer",
+                              "description": "Number of items shown per page.",
+                              "minimum": 0
+                            },
+                            "to": {
+                              "type": [
+                                "integer",
+                                "null"
+                              ],
+                              "description": "Number of the last item in the slice.",
+                              "minimum": 1
+                            },
+                            "total": {
+                              "type": "integer",
+                              "description": "Total number of items being paginated.",
+                              "minimum": 0
+                            }
+                          },
+                          "required": [
+                            "current_page",
+                            "from",
+                            "last_page",
+                            "links",
+                            "path",
+                            "per_page",
+                            "to",
+                            "total"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "links",
+                        "meta"
+                      ]
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/AuthenticationException"
+          },
+          "422": {
+            "$ref": "#/components/responses/ValidationException"
+          }
+        }
+      }
+    },
+    "/v1/entry-exports/{export}": {
+      "get": {
+        "operationId": "entry-exports.show",
+        "tags": [
+          "FormEntryExport"
+        ],
+        "parameters": [
+          {
+            "name": "export",
+            "in": "path",
+            "required": true,
+            "description": "The export ID",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "`FormEntryExportResource`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/FormEntryExportResource"
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/AuthenticationException"
+          },
+          "403": {
+            "$ref": "#/components/responses/AuthorizationException"
+          },
+          "404": {
+            "$ref": "#/components/responses/ModelNotFoundException"
+          }
+        }
+      }
+    },
+    "/v1/forms/{form}/notifications": {
+      "get": {
+        "operationId": "forms.notifications.index",
+        "tags": [
+          "FormNotification"
+        ],
+        "parameters": [
+          {
+            "name": "form",
+            "in": "path",
+            "required": true,
+            "description": "The form ID",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Paginated set of `FormNotificationResource`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/FormNotificationCollection"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "links": {
+                          "type": "object",
+                          "properties": {
+                            "first": {
+                              "type": [
+                                "string",
+                                "null"
+                              ]
+                            },
+                            "last": {
+                              "type": [
+                                "string",
+                                "null"
+                              ]
+                            },
+                            "prev": {
+                              "type": [
+                                "string",
+                                "null"
+                              ]
+                            },
+                            "next": {
+                              "type": [
+                                "string",
+                                "null"
+                              ]
+                            }
+                          },
+                          "required": [
+                            "first",
+                            "last",
+                            "prev",
+                            "next"
+                          ]
+                        },
+                        "meta": {
+                          "type": "object",
+                          "properties": {
+                            "current_page": {
+                              "type": "integer",
+                              "minimum": 1
+                            },
+                            "from": {
+                              "type": [
+                                "integer",
+                                "null"
+                              ],
+                              "minimum": 1
+                            },
+                            "last_page": {
+                              "type": "integer",
+                              "minimum": 1
+                            },
+                            "links": {
+                              "type": "array",
+                              "description": "Generated paginator links.",
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "url": {
+                                    "type": [
+                                      "string",
+                                      "null"
+                                    ]
+                                  },
+                                  "label": {
+                                    "type": "string"
+                                  },
+                                  "active": {
+                                    "type": "boolean"
+                                  }
+                                },
+                                "required": [
+                                  "url",
+                                  "label",
+                                  "active"
+                                ]
+                              }
+                            },
+                            "path": {
+                              "type": [
+                                "string",
+                                "null"
+                              ],
+                              "description": "Base path for paginator generated URLs."
+                            },
+                            "per_page": {
+                              "type": "integer",
+                              "description": "Number of items shown per page.",
+                              "minimum": 0
+                            },
+                            "to": {
+                              "type": [
+                                "integer",
+                                "null"
+                              ],
+                              "description": "Number of the last item in the slice.",
+                              "minimum": 1
+                            },
+                            "total": {
+                              "type": "integer",
+                              "description": "Total number of items being paginated.",
+                              "minimum": 0
+                            }
+                          },
+                          "required": [
+                            "current_page",
+                            "from",
+                            "last_page",
+                            "links",
+                            "path",
+                            "per_page",
+                            "to",
+                            "total"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "links",
+                        "meta"
+                      ]
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/AuthenticationException"
+          },
+          "403": {
+            "$ref": "#/components/responses/AuthorizationException"
+          },
+          "404": {
+            "$ref": "#/components/responses/ModelNotFoundException"
+          }
+        }
+      },
+      "post": {
+        "operationId": "forms.notifications.store",
+        "tags": [
+          "FormNotification"
+        ],
+        "parameters": [
+          {
+            "name": "form",
+            "in": "path",
+            "required": true,
+            "description": "The form ID",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FormNotificationStoreRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "`FormNotificationResource`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/FormNotificationResource"
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/AuthenticationException"
+          },
+          "403": {
+            "$ref": "#/components/responses/AuthorizationException"
+          },
+          "404": {
+            "$ref": "#/components/responses/ModelNotFoundException"
+          },
+          "422": {
+            "$ref": "#/components/responses/ValidationException"
+          }
+        }
+      }
+    },
+    "/v1/notifications/{notification}": {
+      "get": {
+        "operationId": "notifications.show",
+        "tags": [
+          "FormNotification"
+        ],
+        "parameters": [
+          {
+            "name": "notification",
+            "in": "path",
+            "required": true,
+            "description": "The notification ID",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "`FormNotificationResource`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/FormNotificationResource"
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/AuthenticationException"
+          },
+          "403": {
+            "$ref": "#/components/responses/AuthorizationException"
+          },
+          "404": {
+            "$ref": "#/components/responses/ModelNotFoundException"
+          }
+        }
+      },
+      "put": {
+        "operationId": "notifications.update",
+        "tags": [
+          "FormNotification"
+        ],
+        "parameters": [
+          {
+            "name": "notification",
+            "in": "path",
+            "required": true,
+            "description": "The notification ID",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FormNotificationUpdateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "`FormNotificationResource`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/FormNotificationResource"
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/AuthenticationException"
+          },
+          "403": {
+            "$ref": "#/components/responses/AuthorizationException"
+          },
+          "404": {
+            "$ref": "#/components/responses/ModelNotFoundException"
+          },
+          "422": {
+            "$ref": "#/components/responses/ValidationException"
+          }
+        }
+      },
+      "delete": {
+        "operationId": "notifications.destroy",
+        "tags": [
+          "FormNotification"
+        ],
+        "parameters": [
+          {
+            "name": "notification",
+            "in": "path",
+            "required": true,
+            "description": "The notification ID",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No content"
+          },
+          "401": {
+            "$ref": "#/components/responses/AuthenticationException"
+          },
+          "403": {
+            "$ref": "#/components/responses/AuthorizationException"
+          },
+          "404": {
+            "$ref": "#/components/responses/ModelNotFoundException"
+          }
+        }
+      }
+    },
+    "/v1/notifications/{notification}/restore": {
+      "post": {
+        "operationId": "notifications.restore",
+        "tags": [
+          "FormNotification"
+        ],
+        "parameters": [
+          {
+            "name": "notification",
+            "in": "path",
+            "required": true,
+            "description": "The notification ID",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "`FormNotificationResource`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/FormNotificationResource"
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/AuthenticationException"
+          },
+          "403": {
+            "$ref": "#/components/responses/AuthorizationException"
+          },
+          "404": {
+            "$ref": "#/components/responses/ModelNotFoundException"
+          }
+        }
+      }
+    },
+    "/v1/forms/{form}/submissions": {
+      "post": {
+        "operationId": "forms.submissions.store",
+        "description": "The body fields are the form's schema input names (each field's `name`, or its ID), validated with\nthe field's rules. Unknown fields are dropped.\n\nResponds with the form's `redirect` and `message` settings so the client can show the\nsuccess message or navigate to the redirect itself; no 3XX redirect is ever sent.\n\nA submission that fills in the form's honeypot field gets the same response, so bots cannot\ntell, but is stored flagged as spam. Other submissions are checked for spam before the form's\nrecipients are alerted.",
+        "summary": "Accept a public, unauthenticated submission to a form",
+        "tags": [
+          "FormSubmission"
+        ],
+        "parameters": [
+          {
+            "name": "form",
+            "in": "path",
+            "required": true,
+            "description": "The form ID",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "redirect": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "message": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "redirect",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "$ref": "#/components/responses/AuthorizationException"
+          },
+          "404": {
+            "$ref": "#/components/responses/ModelNotFoundException"
+          },
+          "422": {
+            "$ref": "#/components/responses/ValidationException"
+          }
+        },
+        "security": []
+      }
+    },
+    "/v1/auth/forgot-password": {
+      "post": {
+        "operationId": "auth.forgot-password",
+        "summary": "Email a password reset link. The response is the same whether or not the account exists, or\nthe request was throttled, so the endpoint cannot be used to discover registered emails",
+        "tags": [
+          "PasswordReset"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ForgotPasswordRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "const": "If an account exists for that email, a password reset link has been sent."
+                    }
+                  },
+                  "required": [
+                    "message"
+                  ]
+                }
+              }
+            }
+          },
+          "422": {
+            "$ref": "#/components/responses/ValidationException"
+          }
+        },
+        "security": []
+      }
+    },
+    "/v1/auth/reset-password": {
+      "post": {
+        "operationId": "auth.reset-password",
+        "summary": "Set a new password from an emailed reset token and revoke every existing token",
+        "tags": [
+          "PasswordReset"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ResetPasswordRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {}
+                  },
+                  "required": [
+                    "message"
+                  ]
+                }
+              }
+            }
+          },
+          "422": {
+            "$ref": "#/components/responses/ValidationException"
+          }
+        },
+        "security": []
+      }
+    },
+    "/v1/webhooks/postmark/bounces": {
+      "post": {
+        "operationId": "webhooks.postmark.bounces",
+        "summary": "Record a bounce or spam complaint for an alert email on the recipient it was sent to, identified by\nthe recipient ID carried in the message metadata. Anything else, or a message this service did not\ntag, is acknowledged and ignored so Postmark does not retry it",
+        "tags": [
+          "PostmarkWebhook"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "RecordType": {
+                    "type": "string"
+                  },
+                  "Description": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "No content"
+          }
+        },
+        "security": []
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "http": {
+        "type": "http",
+        "scheme": "bearer"
+      }
+    },
+    "schemas": {
+      "ForgotPasswordRequest": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "format": "email"
+          }
+        },
+        "required": [
+          "email"
+        ],
+        "title": "ForgotPasswordRequest"
+      },
+      "FormCollection": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FormResource"
+            }
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "title": "FormCollection"
+      },
+      "FormEntryBulkRequest": {
+        "type": "object",
+        "properties": {
+          "action": {
+            "type": "string",
+            "enum": [
+              "mark_read",
+              "mark_unread",
+              "star",
+              "unstar",
+              "mark_spam",
+              "mark_not_spam",
+              "delete",
+              "restore",
+              "force_delete"
+            ]
+          },
+          "ids": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "minItems": 1,
+            "maxItems": 100,
+            "uniqueItems": true
+          }
+        },
+        "required": [
+          "action",
+          "ids"
+        ],
+        "title": "FormEntryBulkRequest"
+      },
+      "FormEntryCollection": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FormEntryResource"
+            }
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "title": "FormEntryCollection"
+      },
+      "FormEntryExportCollection": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FormEntryExportResource"
+            }
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "title": "FormEntryExportCollection"
+      },
+      "FormEntryExportResource": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "form_id": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "parameters": {
+            "type": "object",
+            "description": "The entry filters and sort the export was created with.",
+            "properties": {
+              "sort": {
+                "type": "string"
+              },
+              "filter": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "filename": {
+            "type": "string"
+          },
+          "row_count": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "error": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "download_url": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "A temporary signed link to the CSV, usable without the API token, e.g. as a plain browser\nlink. It expires a few minutes after this response (see `EXPORT_DOWNLOAD_URL_TTL`), so\nfetch the export again for a fresh link. `null` until the export is completed."
+          },
+          "completed_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "expires_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "created_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "updated_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "form_id",
+          "status",
+          "parameters",
+          "filename",
+          "row_count",
+          "error",
+          "download_url",
+          "completed_at",
+          "expires_at",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "FormEntryExportResource"
+      },
+      "FormEntryIndexRequest": {
+        "type": "object",
+        "properties": {
+          "per_page": {
+            "type": "integer",
+            "description": "Results per page, from 1 to 100. Defaults to 15. Ignored when requesting an export.",
+            "minimum": 1,
+            "maximum": 100
+          },
+          "sort": {
+            "type": "string",
+            "enum": [
+              "created_at",
+              "-created_at",
+              "spam_score",
+              "-spam_score"
+            ]
+          },
+          "filter": {
+            "type": "object",
+            "description": "Every filter is optional. Unknown keys are rejected.",
+            "properties": {
+              "read": {
+                "type": "string",
+                "enum": [
+                  "true",
+                  "false",
+                  "1",
+                  "0"
+                ]
+              },
+              "starred": {
+                "type": "string",
+                "enum": [
+                  "true",
+                  "false",
+                  "1",
+                  "0"
+                ]
+              },
+              "spam": {
+                "type": "string",
+                "enum": [
+                  "true",
+                  "false",
+                  "1",
+                  "0"
+                ]
+              },
+              "created_from": {
+                "type": "string",
+                "format": "date"
+              },
+              "created_to": {
+                "type": "string",
+                "format": "date"
+              },
+              "trashed": {
+                "type": "string",
+                "enum": [
+                  "with",
+                  "only"
+                ]
+              }
+            }
+          }
+        },
+        "title": "FormEntryIndexRequest"
+      },
+      "FormEntryResource": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "form_id": {
+            "type": "string"
+          },
+          "input": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "additionalProperties": {}
+          },
+          "ip": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "ip_location_display": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "referer": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "user_agent": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "user_agent_display": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "platform": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "browser": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "browser_version": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            },
+            "required": [
+              "platform",
+              "browser",
+              "browser_version"
+            ]
+          },
+          "spam": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "spam_score": {
+            "type": "number",
+            "description": "Spam likelihood from 0 (not spam) to 1 (spam), to two decimal places."
+          },
+          "spam_reason": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "spam_checked_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "When the entry's spam check finished: when it was created for honeypot hits and entries\ncreated through the API, or when Jev classified a public submission. `null` while a\nsubmission awaits classification, or if classification was unavailable."
+          },
+          "starred": {
+            "type": "boolean"
+          },
+          "read_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "created_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "updated_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "deleted_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "form_id",
+          "input",
+          "ip",
+          "ip_location_display",
+          "referer",
+          "user_agent",
+          "user_agent_display",
+          "spam",
+          "spam_score",
+          "spam_reason",
+          "spam_checked_at",
+          "starred",
+          "read_at",
+          "created_at",
+          "updated_at",
+          "deleted_at"
+        ],
+        "title": "FormEntryResource"
+      },
+      "FormEntryUpdateRequest": {
+        "type": "object",
+        "properties": {
+          "input": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "description": "Recorded at submission time. Rejected if sent.",
+            "additionalProperties": {}
+          },
+          "ip": {
+            "type": "string"
+          },
+          "ip_location_display": {
+            "type": "string"
+          },
+          "referer": {
+            "type": "string"
+          },
+          "user_agent": {
+            "type": "string"
+          },
+          "user_agent_display": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "description": "Recorded at submission time. Rejected if sent.",
+            "properties": {
+              "platform": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "browser": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "browser_version": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            },
+            "required": [
+              "platform",
+              "browser",
+              "browser_version"
+            ]
+          },
+          "spam_checked_at": {
+            "type": "string",
+            "description": "Recorded by the spam check. Rejected if sent."
+          },
+          "spam": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "spam_score": {
+            "type": "number",
+            "description": "Rounded to two decimal places when stored.",
+            "minimum": 0,
+            "maximum": 9.99
+          },
+          "spam_reason": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "starred": {
+            "type": "boolean"
+          },
+          "read_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          }
+        },
+        "title": "FormEntryUpdateRequest"
+      },
+      "FormNotificationCollection": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FormNotificationResource"
+            }
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "title": "FormNotificationCollection"
+      },
+      "FormNotificationResource": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "form_id": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string"
+          },
+          "value": {
+            "type": "string"
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "error": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "created_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "updated_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "deleted_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "form_id",
+          "type",
+          "value",
+          "enabled",
+          "error",
+          "created_at",
+          "updated_at",
+          "deleted_at"
+        ],
+        "title": "FormNotificationResource"
+      },
+      "FormNotificationStoreRequest": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "email",
+              "sms"
+            ]
+          },
+          "value": {
+            "type": "string",
+            "maxLength": 255
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "error": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "type",
+          "value"
+        ],
+        "title": "FormNotificationStoreRequest"
+      },
+      "FormNotificationUpdateRequest": {
+        "type": "object",
+        "properties": {
+          "form_id": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "email",
+              "sms"
+            ]
+          },
+          "value": {
+            "type": "string",
+            "maxLength": 255
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "error": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "type",
+          "value",
+          "enabled"
+        ],
+        "title": "FormNotificationUpdateRequest"
+      },
+      "FormResource": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "user_id": {
+            "type": "integer"
+          },
+          "name": {
+            "type": "string"
+          },
+          "active": {
+            "type": "boolean"
+          },
+          "schema": {
+            "type": [
+              "array",
+              "null"
+            ],
+            "description": "Fields sorted by `order`.",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "order": {
+                  "type": "integer"
+                },
+                "label": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "rules": {
+                  "anyOf": [
+                    {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    {
+                      "type": "string"
+                    }
+                  ]
+                }
+              },
+              "required": [
+                "id",
+                "order"
+              ]
+            }
+          },
+          "settings": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "redirect": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "timezone": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "domains": {
+                "type": [
+                  "array",
+                  "null"
+                ],
+                "items": {
+                  "type": "string"
+                }
+              },
+              "message": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "honeypot_enabled": {
+                "type": "boolean"
+              },
+              "honeypot_name": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            },
+            "required": [
+              "redirect",
+              "timezone",
+              "domains",
+              "message",
+              "honeypot_enabled",
+              "honeypot_name"
+            ]
+          },
+          "entries_count": {
+            "type": "integer",
+            "description": "Entries on the form, excluding spam and deleted ones. Included in the form list only."
+          },
+          "unread_entries_count": {
+            "type": "integer",
+            "description": "Entries on the form not yet marked read, excluding spam and deleted ones. Included in the form list only."
+          },
+          "spam_entries_count": {
+            "type": "integer",
+            "description": "Entries on the form marked as spam, excluding deleted ones. Included in the form list only."
+          },
+          "created_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "updated_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "deleted_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "user_id",
+          "name",
+          "active",
+          "schema",
+          "settings",
+          "created_at",
+          "updated_at",
+          "deleted_at"
+        ],
+        "title": "FormResource"
+      },
+      "FormSettings": {
+        "type": "object",
+        "additionalProperties": {},
+        "title": "FormSettings"
+      },
+      "FormStoreRequest": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 400
+          },
+          "schema": {
+            "type": [
+              "array",
+              "null"
+            ],
+            "description": "A list of fields. Each has a unique ULID `id` and an integer `order` used to sort fields for\ndisplay, and may set a `label`, an input `name` (defaults to the ID) and Laravel validation\n`rules` (an array or a comma-separated string). Other keys are rejected.",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "order": {
+                  "type": "integer"
+                },
+                "label": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "name": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "rules": {
+                  "type": [
+                    "array",
+                    "null"
+                  ],
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              },
+              "required": [
+                "id",
+                "order"
+              ]
+            }
+          },
+          "settings": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "description": "Every key is optional and takes its default when omitted. Unknown keys are rejected.",
+            "properties": {
+              "redirect": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "timezone": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "domains": {
+                "type": [
+                  "array",
+                  "null"
+                ],
+                "items": {
+                  "type": "string"
+                }
+              },
+              "message": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "honeypot_enabled": {
+                "type": "boolean"
+              },
+              "honeypot_name": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            }
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "title": "FormStoreRequest"
+      },
+      "FormUpdateRequest": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 400
+          },
+          "active": {
+            "type": "boolean"
+          },
+          "schema": {
+            "type": [
+              "array",
+              "null"
+            ],
+            "description": "A list of fields. Each has a unique ULID `id` and an integer `order` used to sort fields for\ndisplay, and may set a `label`, an input `name` (defaults to the ID) and Laravel validation\n`rules` (an array or a comma-separated string). Other keys are rejected.",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "order": {
+                  "type": "integer"
+                },
+                "label": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "name": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "rules": {
+                  "type": [
+                    "array",
+                    "null"
+                  ],
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              },
+              "required": [
+                "id",
+                "order"
+              ]
+            }
+          },
+          "settings": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "description": "Every key is optional and takes its default when omitted. Unknown keys are rejected.",
+            "properties": {
+              "redirect": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "timezone": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "domains": {
+                "type": [
+                  "array",
+                  "null"
+                ],
+                "items": {
+                  "type": "string"
+                }
+              },
+              "message": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "honeypot_enabled": {
+                "type": "boolean"
+              },
+              "honeypot_name": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            }
+          }
+        },
+        "required": [
+          "name",
+          "active"
+        ],
+        "title": "FormUpdateRequest"
+      },
+      "LoginRequest": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "format": "email"
+          },
+          "password": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "email",
+          "password"
+        ],
+        "title": "LoginRequest"
+      },
+      "ResetPasswordRequest": {
+        "type": "object",
+        "properties": {
+          "token": {
+            "type": "string"
+          },
+          "email": {
+            "type": "string",
+            "format": "email"
+          },
+          "password": {
+            "type": "string"
+          },
+          "password_confirmation": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "token",
+          "email",
+          "password",
+          "password_confirmation"
+        ],
+        "title": "ResetPasswordRequest"
+      },
+      "UpdatePasswordRequest": {
+        "type": "object",
+        "properties": {
+          "current_password": {
+            "type": "string"
+          },
+          "password": {
+            "type": "string"
+          },
+          "password_confirmation": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "current_password",
+          "password",
+          "password_confirmation"
+        ],
+        "title": "UpdatePasswordRequest"
+      },
+      "UpdateProfileRequest": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 255
+          },
+          "email": {
+            "type": "string",
+            "format": "email",
+            "maxLength": 255
+          }
+        },
+        "title": "UpdateProfileRequest"
+      },
+      "UserResource": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "name": {
+            "type": "string"
+          },
+          "email": {
+            "type": "string"
+          },
+          "email_verified_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "created_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "updated_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "email",
+          "email_verified_at",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "UserResource"
+      }
+    },
+    "responses": {
+      "ValidationException": {
+        "description": "Validation error",
+        "content": {
+          "application/json": {
+            "schema": {
+              "type": "object",
+              "properties": {
+                "message": {
+                  "type": "string",
+                  "description": "Errors overview."
+                },
+                "errors": {
+                  "type": "object",
+                  "description": "A detailed description of each field that failed validation.",
+                  "additionalProperties": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  }
+                }
+              },
+              "required": [
+                "message",
+                "errors"
+              ]
+            }
+          }
+        }
+      },
+      "AuthenticationException": {
+        "description": "Unauthenticated",
+        "content": {
+          "application/json": {
+            "schema": {
+              "type": "object",
+              "properties": {
+                "message": {
+                  "type": "string",
+                  "description": "Error overview."
+                }
+              },
+              "required": [
+                "message"
+              ]
+            }
+          }
+        }
+      },
+      "ModelNotFoundException": {
+        "description": "Not found",
+        "content": {
+          "application/json": {
+            "schema": {
+              "type": "object",
+              "properties": {
+                "message": {
+                  "type": "string",
+                  "description": "Error overview."
+                }
+              },
+              "required": [
+                "message"
+              ]
+            }
+          }
+        }
+      },
+      "AuthorizationException": {
+        "description": "Authorization error",
+        "content": {
+          "application/json": {
+            "schema": {
+              "type": "object",
+              "properties": {
+                "message": {
+                  "type": "string",
+                  "description": "Error overview."
+                }
+              },
+              "required": [
+                "message"
+              ]
+            }
+          }
+        }
+      }
+    }
+  }
+}

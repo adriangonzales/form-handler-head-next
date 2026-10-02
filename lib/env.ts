@@ -33,7 +33,10 @@ export type ServerEnv = z.infer<typeof serverEnvSchema>
 
 /** Parses server configuration, throwing one error that lists every missing or invalid variable. */
 export function parseServerEnv(env: Record<string, string | undefined>): ServerEnv {
-  const result = serverEnvSchema.safeParse(env)
+  // An empty variable (`REDIS_URL=`) means unset, as it does in .env files.
+  const result = serverEnvSchema.safeParse(
+    Object.fromEntries(Object.entries(env).filter(([, value]) => value !== '')),
+  )
 
   if (!result.success) {
     const problems = result.error.issues.map(

@@ -1,6 +1,6 @@
 # PRD: Authentication & Session
 
-**Status:** Planned (milestone 2) · **Owner area:** `proxy.ts`, `lib/session/*` (`session.ts`, `refresh-coordinator.ts`, `redis-store.ts`, `memory-store.ts`, `token-action.ts`), `lib/backend/auth.ts`, `app/api/auth/*/route.ts`, `app/api/backend/[...path]/route.ts`, `app/(auth)/login`, `app/(auth)/forgot-password`, `app/(auth)/reset-password`, `hooks/useHydrated.ts`, iron-session, Redis
+**Status:** Built (milestone 2, 2026-10-02). The emailed reset link hasn't been verified end to end (AC-6) · **Owner area:** `proxy.ts`, `lib/session/*` (`session.ts`, `session-token.ts`, `server.ts`, `coordinator.ts`, `refresh-coordinator.ts`, `refresh-store.ts`, `redis-refresh-store.ts`, `token-action.ts`), `lib/backend/auth.ts`, `lib/backend/render.ts`, `app/api/auth/*/route.ts`, `app/api/backend/[...path]/route.ts`, `app/(auth)/*`, `components/auth/*`, `hooks/use-hydrated.ts`, iron-session, ioredis
 
 ## 1. Summary
 
@@ -55,9 +55,9 @@ Next.js-specific constraint: **Server Components can't set cookies.** A refresh 
 
 Refreshing invalidates the old token, so refreshes must never overlap — across requests, browser tabs, and server instances:
 
-- `RefreshCoordinator` takes a Redis lock per old token (`SET key NX PX`), keyed by a hash of the token, never the token itself. The request holding the lock refreshes; others wait for its result.
+- `RefreshCoordinator` takes a Redis lock per old token (`SET key NX PX`, 10 s), keyed by a SHA-256 hash of the token, never the token itself (`form-handler:refresh:lock:{hash}`). The request holding the lock refreshes; others poll for its result. Only the lock's owner releases it (a compare-and-delete script).
 - The result (the new token set, encrypted with `SESSION_SECRET`) is kept under the old token's hash for 60 s. Requests still carrying the old token in that time reuse the result instead of sending the invalidated token, and save the new token to their own cookie. This covers parallel requests from one page, a browser that hasn't received the new cookie yet, and several server instances.
-- **Redis unavailable:** fail closed. The request returns 503 ("Service temporarily unavailable, try again"), the session is kept, and no refresh happens without the lock.
+- **Redis unavailable:** fail closed. Commands time out after a second, so the proxy route and the auth route handlers answer 503 ("Service temporarily unavailable. Please try again.") within about that, the session is kept, and no refresh happens without the lock. A page navigation renders with the current token instead of failing, since it stays valid for `AUTH_REFRESH_AHEAD_SECONDS`. **Lesson from this build:** `ioredis` with its offline queue turned off fails every command sent before the first connection completes, so each server's first refresh answered 503. The queue stays on, bounded by `commandTimeout`.
 - **Without `REDIS_URL`** (unit tests, `pnpm dev:mock`, and optional in local dev) an in-memory store with the same interface is used. Production refuses to start without `REDIS_URL`.
 - A refresh that fails because The Backend is unreachable returns 502 and keeps the session. Only a 401 from The Backend ends it.
 - **Lesson from Nuxt:** the 60 s reuse window is needed, not just the lock. Without it, a request that started with the old cookie just after another request refreshed sends an invalidated token and signs the user out.
@@ -66,7 +66,7 @@ Refreshing invalidates the old token, so refreshes must never overlap — across
 
 - The session cookie's `maxAge` equals The Backend's refresh window (`BACKEND_REFRESH_WINDOW_SECONDS`, 604800 s = 7 days today). Keep it in sync with The Backend's configuration.
 - Refreshing doesn't extend `refreshableUntil`, because the contract anchors the refresh window to the original login (_Backend Auth FR-4_).
-- After `refreshableUntil`, `proxy.ts` and the proxy route destroy the session without calling The Backend. Navigations redirect to `/login?expired=1&next=…`, API calls return 401. The login page then says "Your session has expired. Please sign in again."
+- After `refreshableUntil`, `proxy.ts` and the proxy route destroy the session without calling The Backend. Navigations redirect to `/login?reason=expired&next=…`, API calls return 401. The login page then says "Your session has expired. Please sign in again."
 - The decision ("use", "refresh", or "expired") is one pure function, `tokenAction(session, now)`, unit-tested with a fixed clock.
 
 **FR-7 Revoked tokens.**
@@ -83,7 +83,7 @@ Refreshing invalidates the old token, so refreshes must never overlap — across
 **FR-9 Reset password.**
 
 - `/reset-password?token=…&email=…` is the page The Backend's reset email links to. The Backend must be configured to link to this dashboard's `/reset-password` (_Backend Auth FR-12_; see [the contract](../backend-contract.md)). It shows the email read-only, with new password and confirmation fields, and the password requirements text from `NEXT_PUBLIC_PASSWORD_REQUIREMENTS`.
-- It calls `POST /v1/auth/reset-password` through `POST /api/auth/reset-password`. On success it goes to `/login?reset=1` with a "Password reset. Sign in with your new password." notice.
+- It calls `POST /v1/auth/reset-password` through `POST /api/auth/reset-password`. On success it goes to `/login?reason=password-reset` with a "Password reset. Sign in with your new password." notice.
 - 422 on `email` (invalid or expired token) shows the error with a link back to `/forgot-password`.
 - Password-policy errors appear on the password field.
 - If `token` or `email` is missing, the page shows "This reset link is incomplete" and the forgot-password link.

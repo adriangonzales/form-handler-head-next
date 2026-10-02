@@ -5,3 +5,4 @@ types/api.d.ts
 test-results
 playwright-report
 .omc
+types/openapi.json
