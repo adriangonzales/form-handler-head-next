@@ -1,6 +1,6 @@
 # PRD: App Shell & Architecture
 
-**Status:** Planned (milestones 1–2, polished in milestone 9, mock-backend run in milestone 10) · **Owner area:** `next.config.ts`, `proxy.ts`, `lib/backend/*`, `lib/api-client.ts`, `lib/query-keys.ts`, `lib/form-errors.ts`, `app/api/backend/[...path]/route.ts`, `app/(dashboard)/layout.tsx`, `app/(auth)/layout.tsx`, `app/error.tsx`, `app/not-found.tsx`, `app/global-error.tsx`, `components/shared/*`, `types/*`, `scripts/generate-api-types.mjs`, `tests/mocks/*`, `tests/contract/*`
+**Status:** Partly built. Milestone 1 (2026-10-02): configuration (FR-1), generated types (FR-2), tooling, and the contract suite's first checks (FR-15). Planned: the backend boundary and proxy, layout and shared UI (milestone 2), polish (9), and the mock-backend run (10) · **Owner area:** `next.config.ts`, `proxy.ts`, `lib/backend/*`, `lib/api-client.ts`, `lib/query-keys.ts`, `lib/form-errors.ts`, `app/api/backend/[...path]/route.ts`, `app/(dashboard)/layout.tsx`, `app/(auth)/layout.tsx`, `app/error.tsx`, `app/not-found.tsx`, `app/global-error.tsx`, `components/shared/*`, `types/*`, `scripts/generate-api-types.mjs`, `tests/mocks/*`, `tests/contract/*`
 
 ## 1. Summary
 
@@ -33,7 +33,7 @@ This PRD covers the foundation every feature builds on:
 - The server reads `BACKEND_API_URL` (The Backend's API base, server-only), `BACKEND_REFRESH_WINDOW_SECONDS`, `AUTH_REFRESH_AHEAD_SECONDS`, `SESSION_SECRET` and `REDIS_URL` from the environment. The browser gets `NEXT_PUBLIC_BACKEND_PUBLIC_URL` (the base shown in embed snippets and used by the test-submit tool) and `NEXT_PUBLIC_PASSWORD_REQUIREMENTS`.
 - Server-only values are read at request time through one typed, zod-validated `lib/env.ts`, so a production build can be configured at runtime. The app fails to start with a clear message if a required value is missing or malformed (for example `SESSION_SECRET` under 32 characters).
 - `NEXT_PUBLIC_*` values are inlined at build time, as Next.js requires. The README says so, because changing them needs a rebuild.
-- `.env.example` documents every variable, including the test-only ones (`E2E_EMAIL`, `E2E_PASSWORD`, `E2E_CREATE_USER_CMD`, `E2E_DELETE_USER_CMD`).
+- `.env.example` documents every variable, including the test-only ones (`E2E_EMAIL`, `E2E_PASSWORD`, `E2E_CREATE_USER_CMD`).
 - No variable is named after a backend framework.
 
 **FR-2 Generated API types.**

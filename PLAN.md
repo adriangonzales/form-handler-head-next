@@ -10,12 +10,14 @@ Next.js frontend (dashboard) for the **Headless Form Handler** API, referred to 
 ## 1. Goals and non-goals
 
 **Goals**
+
 1. Same feature set as the Nuxt dashboard: auth, forms, schema builder, embed/test-submit, entries triage, exports, notifications, account.
 2. **Backend-agnostic.** Everything The Backend-specific lives behind one boundary (§4). Swapping The Backend means changing env vars, and nothing else, as long as the new backend passes the contract suite (§8).
 3. The access token never reaches browser JavaScript.
 4. Every API call is typed from the OpenAPI spec, so contract changes surface as type errors.
 
 **Non-goals**
+
 - No sign-up (the API has none).
 - No backend-specific tooling in the app or its tests (no `php artisan`, no Laravel env names, no assumptions about Laravel internals).
 - The Postmark bounce webhook (`POST /v1/webhooks/postmark/bounces`) is backend-to-provider and is never called or proxied by this app.
@@ -24,25 +26,27 @@ Next.js frontend (dashboard) for the **Headless Form Handler** API, referred to 
 
 These are the conventions the app relies on. Each is handled in exactly one place in the code (listed), so a backend that differs slightly can be adapted there.
 
-| Convention | Contract | Handled in |
-|---|---|---|
-| Auth | `POST /v1/auth/login` → `{ access_token, token_type: "bearer", expires_in }`. Bearer token on every call. `POST /v1/auth/refresh` exchanges a current or recently expired token and **invalidates the old one**. `POST /v1/auth/logout`. `GET /v1/auth/me`. | `lib/backend/auth.ts` |
-| Refresh window | A token can be refreshed until a fixed time after the original login (7 days for The Backend today). The window doesn't slide on refresh. Configured, not hard-coded: `BACKEND_REFRESH_WINDOW_SECONDS`. | `lib/session/` |
-| Password change | `PUT /v1/auth/password` revokes every token and returns a new one, which the session must store. | `app/api/auth/password/route.ts` |
-| Account deletion | `DELETE /v1/auth/me?password=…` (password as a query parameter — only ever sent server to server). | `app/api/auth/me/route.ts` |
-| Password reset | `forgot-password` always returns the same response (anti-enumeration). The Backend emails a link to a configured URL with `?token=…&email=…`, which must point at this app's `/reset-password`. | `app/(auth)/reset-password` |
-| Pagination | `{ data, links: {first,last,prev,next}, meta: {current_page, last_page, per_page, total, from, to, …} }`. 15 per page by default; `per_page` 1–100 on forms and entries; notifications fixed at 15. | `lib/backend/pagination.ts` → `Paginated<T>` |
-| Sorting / filtering | `sort=field` / `sort=-field`; `filter[key]=value` bracket syntax. | `lib/backend/query.ts` |
-| Errors | 422 `{ message, errors: { field: string[] } }`; 401, 403, 404, 409, 410 with `{ message }`. | `lib/backend/errors.ts` → `BackendError` |
-| IDs | ULID strings for forms, entries, notifications, exports, and schema field IDs; integer user IDs. | `lib/ulid.ts`, types |
-| Form schema | A list of `{ id (ULID), order (int), label?, name?, rules? }`. Other keys rejected; responses sorted by `order`. `name` defaults to the id. `rules` are validation rule strings in the API's rule syntax (`required`, `email`, `max:N`, `in:a,b`, …), as an array or comma-separated string. | `lib/schema/` |
-| Form settings | `redirect`, `timezone`, `domains: string[]`, `message`, `honeypot_enabled`, `honeypot_name` — all optional and nullable; unknown keys rejected. | `lib/forms/settings.ts` |
-| Public submit | `POST /v1/forms/{form}/submissions`, no auth, called from the browser (CORS). Returns `{ redirect, message }`, never a 3xx. Unknown fields dropped. | `lib/snippets.ts`, test-submit |
-| Spam check | Asynchronous after submission. `spam_checked_at` null while pending (or if it couldn't run); `spam_score` is a 0–1 likelihood; entries may move to Spam after arriving. | `lib/entries/spam.ts` |
-| Exports | Queued: create → poll → download. `download_url` is a short-lived (~5 min) signed absolute URL needing no bearer token, `null` until complete. `/download` returns 409 not ready, 410 expired, 403 bad/expired signature. The URL's host is whatever host The Backend saw on the request — see §4. | `lib/exports/` |
+| Convention          | Contract                                                                                                                                                                                                                                                                                           | Handled in                                   |
+| ------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------- |
+| Auth                | `POST /v1/auth/login` → `{ access_token, token_type: "bearer", expires_in }`. Bearer token on every call. `POST /v1/auth/refresh` exchanges a current or recently expired token and **invalidates the old one**. `POST /v1/auth/logout`. `GET /v1/auth/me`.                                        | `lib/backend/auth.ts`                        |
+| Refresh window      | A token can be refreshed until a fixed time after the original login (7 days for The Backend today). The window doesn't slide on refresh. Configured, not hard-coded: `BACKEND_REFRESH_WINDOW_SECONDS`.                                                                                            | `lib/session/`                               |
+| Password change     | `PUT /v1/auth/password` revokes every token and returns a new one, which the session must store.                                                                                                                                                                                                   | `app/api/auth/password/route.ts`             |
+| Account deletion    | `DELETE /v1/auth/me?password=…` (password as a query parameter — only ever sent server to server).                                                                                                                                                                                                 | `app/api/auth/me/route.ts`                   |
+| Password reset      | `forgot-password` always returns the same response (anti-enumeration). The Backend emails a link to a configured URL with `?token=…&email=…`, which must point at this app's `/reset-password`.                                                                                                    | `app/(auth)/reset-password`                  |
+| Pagination          | `{ data, links: {first,last,prev,next}, meta: {current_page, last_page, per_page, total, from, to, …} }`. 15 per page by default; `per_page` 1–100 on forms and entries; notifications fixed at 15.                                                                                                | `lib/backend/pagination.ts` → `Paginated<T>` |
+| Sorting / filtering | `sort=field` / `sort=-field`; `filter[key]=value` bracket syntax.                                                                                                                                                                                                                                  | `lib/backend/query.ts`                       |
+| Errors              | 422 `{ message, errors: { field: string[] } }`; 401, 403, 404, 409, 410 with `{ message }`.                                                                                                                                                                                                        | `lib/backend/errors.ts` → `BackendError`     |
+| IDs                 | ULID strings for forms, entries, notifications, exports, and schema field IDs; integer user IDs.                                                                                                                                                                                                   | `lib/ulid.ts`, types                         |
+| Form schema         | A list of `{ id (ULID), order (int), label?, name?, rules? }`. Other keys rejected; responses sorted by `order`. `name` defaults to the id. `rules` are validation rule strings in the API's rule syntax (`required`, `email`, `max:N`, `in:a,b`, …), as an array or comma-separated string.       | `lib/schema/`                                |
+| Form settings       | `redirect`, `timezone`, `domains: string[]`, `message`, `honeypot_enabled`, `honeypot_name` — all optional and nullable; unknown keys rejected.                                                                                                                                                    | `lib/forms/settings.ts`                      |
+| Public submit       | `POST /v1/forms/{form}/submissions`, no auth, called from the browser (CORS). Returns `{ redirect, message }`, never a 3xx. Unknown fields dropped.                                                                                                                                                | `lib/snippets.ts`, test-submit               |
+| Spam check          | Asynchronous after submission. `spam_checked_at` null while pending (or if it couldn't run); `spam_score` is a 0–1 likelihood; entries may move to Spam after arriving.                                                                                                                            | `lib/entries/spam.ts`                        |
+| Exports             | Queued: create → poll → download. `download_url` is a short-lived (~5 min) signed absolute URL needing no bearer token, `null` until complete. `/download` returns 409 not ready, 410 expired, 403 bad/expired signature. The URL's host is whatever host The Backend saw on the request — see §4. | `lib/exports/`                               |
 
 ### Spec accuracy (fixed in The Backend 2026-10-02)
+
 The four spec quirks found while planning are fixed in The Backend, so the generated types are used as they are:
+
 - `access_token` is `string` (was `boolean | string`);
 - `FormEntryResource.spam_score` is a `number` — the API now returns `0.125`, not `"0.125"`;
 - `FormEntryExportResource.parameters` is an object `{ sort?, filter? }` (was `string`);
@@ -52,24 +56,24 @@ The Backend's `tests/Feature/OpenApiDocumentTest.php` keeps them from regressing
 
 ## 3. Stack
 
-| Concern | Choice | Why |
-|---|---|---|
-| Framework | **Next.js** latest stable (16.x at time of writing — confirm at scaffold), App Router, React 19, TypeScript strict | Requested. Server route handlers give us the BFF |
-| UI | **shadcn/ui** (Radix, Tailwind v4) + **lucide-react** icons | Closest match to Nuxt UI: owned components, accessible primitives |
-| Tables | **TanStack Table** | Schema-driven entry columns, row selection for bulk actions |
-| Server state | **TanStack Query** | Polling (exports, spam checks), optimistic toggles, invalidation after mutations |
-| URL state | **nuqs** | Filters, sort, page and page size kept in the URL (the Nuxt `useListQuery`) |
-| Forms | **react-hook-form** + **zod** | 422 errors mapped onto fields with `setError` |
-| Session | **iron-session** (sealed, httpOnly cookie) | Equivalent of nuxt-auth-utils |
-| Shared state | **Redis** (`ioredis`) | Refresh coordinator across instances and serverless invocations |
-| API types | **openapi-typescript** + **openapi-fetch** (server) | Typed paths, params and bodies from the spec |
-| Drag and drop | **@dnd-kit** | Schema field reordering, with keyboard support |
-| Toasts | **sonner** (shadcn) | Undo actions on delete |
-| Dates | **date-fns** + `date-fns-tz` | Ranges and form timezones |
-| Testing | **Vitest** (+ Testing Library), **Playwright** + `@axe-core/playwright`, **MSW** | MSW mock backend generated from the spec — see §8 |
-| Lint/format | ESLint (next config), Prettier | |
-| Package manager | pnpm 10 (pinned in `packageManager`) | Same as the Nuxt project |
-| TypeScript | 5.x (pinned `^5`) | `openapi-typescript` needs the JS compiler API that TS 7 lacks (same finding as the Nuxt project) |
+| Concern         | Choice                                                                                                             | Why                                                                                                                                                |
+| --------------- | ------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Framework       | **Next.js** latest stable (16.x at time of writing — confirm at scaffold), App Router, React 19, TypeScript strict | Requested. Server route handlers give us the BFF                                                                                                   |
+| UI              | **shadcn/ui** (Radix, Tailwind v4) + **lucide-react** icons                                                        | Closest match to Nuxt UI: owned components, accessible primitives                                                                                  |
+| Tables          | **TanStack Table**                                                                                                 | Schema-driven entry columns, row selection for bulk actions                                                                                        |
+| Server state    | **TanStack Query**                                                                                                 | Polling (exports, spam checks), optimistic toggles, invalidation after mutations                                                                   |
+| URL state       | **nuqs**                                                                                                           | Filters, sort, page and page size kept in the URL (the Nuxt `useListQuery`)                                                                        |
+| Forms           | **react-hook-form** + **zod**                                                                                      | 422 errors mapped onto fields with `setError`                                                                                                      |
+| Session         | **iron-session** (sealed, httpOnly cookie)                                                                         | Equivalent of nuxt-auth-utils                                                                                                                      |
+| Shared state    | **Redis** (`ioredis`)                                                                                              | Refresh coordinator across instances and serverless invocations                                                                                    |
+| API types       | **openapi-typescript** + **openapi-fetch** (server)                                                                | Typed paths, params and bodies from the spec                                                                                                       |
+| Drag and drop   | **@dnd-kit**                                                                                                       | Schema field reordering, with keyboard support                                                                                                     |
+| Toasts          | **sonner** (shadcn)                                                                                                | Undo actions on delete                                                                                                                             |
+| Dates           | **date-fns** + `date-fns-tz`                                                                                       | Ranges and form timezones                                                                                                                          |
+| Testing         | **Vitest** (+ Testing Library), **Playwright** + `@axe-core/playwright`, **MSW**                                   | MSW mock backend generated from the spec — see §8                                                                                                  |
+| Lint/format     | ESLint 9 (next config) + `eslint-config-prettier`, Prettier with the Tailwind plugin                               | ESLint 10 crashes `eslint-plugin-react`, which `eslint-config-next` 16.3 depends on (checked 2026-10-02). Revisit when the Next config supports it |
+| Package manager | pnpm 10 (pinned in `packageManager`)                                                                               | Same as the Nuxt project                                                                                                                           |
+| TypeScript      | 5.x (pinned `^5`)                                                                                                  | `openapi-typescript` needs the JS compiler API that TS 7 lacks (same finding as the Nuxt project)                                                  |
 
 ## 4. Architecture
 
@@ -85,7 +89,9 @@ Browser ──(sealed cookie)──▶ Next.js server ────────�
 ```
 
 ### The backend boundary — `lib/backend/` (server-only)
+
 The only code that knows The Backend's base URL, auth header, token format, pagination and error shapes. Marked `import 'server-only'`.
+
 - `client.ts` — `openapi-fetch` client built from `BACKEND_API_URL`, injecting the bearer token and forwarding `X-Forwarded-For/-Host/-Proto`.
 - `auth.ts` — login / refresh / logout / me, returning a normalised `TokenSet { token, expiresAt }`.
 - `errors.ts` — turns any non-2xx into `BackendError { status, message, fieldErrors }`.
@@ -94,6 +100,7 @@ The only code that knows The Backend's base URL, auth header, token format, pagi
 Nothing outside `lib/backend/` imports the generated `api.d.ts` paths directly; UI code uses the aliases in `types/models.ts`. A backend with a different but equivalent convention (e.g. another pagination envelope) is adapted here.
 
 ### Session and token refresh
+
 - **Login** (`app/api/auth/login/route.ts`): calls login then `me`, stores `{ user, token, expiresAt, refreshableUntil }` in the iron-session cookie (`maxAge` = `BACKEND_REFRESH_WINDOW_SECONDS`). `refreshableUntil` is fixed at first login.
 - **Next.js-specific constraint:** Server Components cannot set cookies. A refresh during an RSC render could not be saved, and since refresh invalidates the old token, the next request would fail. So:
   1. `proxy.ts` (Next 16's middleware, Node runtime) runs on every dashboard navigation. It refreshes the token when it's within `AUTH_REFRESH_AHEAD_SECONDS` (default 120) of expiry and writes the new cookie **before** rendering, so Server Components always read a fresh token and never refresh themselves. Past `refreshableUntil` it clears the session and redirects to `/login?next=…`.
@@ -103,26 +110,29 @@ Nothing outside `lib/backend/` imports the generated `api.d.ts` paths directly; 
 - **Password change** stores the returned token and restarts the refresh window.
 
 ### Data flow
+
 - Pages are Server Components that read the session and the route params, prefetch the first page of data through `lib/backend` with TanStack Query's `HydrationBoundary`, and render client components.
 - Client components fetch and mutate through `/api/backend/**` with TanStack Query. One `queryKeys.ts` factory; mutations invalidate the affected keys.
 - No Server Actions for API mutations in v1: one client path (the proxy) keeps error handling, 401 handling and optimistic updates uniform. Revisit after milestone 3.
 
 ### Export downloads
+
 The UI re-fetches the export just before download to get a fresh `download_url`, then follows a plain link so the CSV goes straight from The Backend to the browser. The signed URL uses the host The Backend saw, and that request came from the Next server, so either `BACKEND_API_URL` is The Backend's **public** origin, or the server calls an internal address and The Backend trusts the forwarded `Host`/`Proto` headers. Documented as a deployment requirement for any backend.
 
 ### Configuration (`.env.example`)
-| Variable | Scope | Purpose |
-|---|---|---|
-| `BACKEND_API_URL` | server | The Backend's API base (e.g. `http://127.0.0.1:8001/api`) |
-| `BACKEND_SPEC_URL` | build/dev | OpenAPI spec for type generation and contract tests; derived from `BACKEND_API_URL` if unset |
-| `NEXT_PUBLIC_BACKEND_PUBLIC_URL` | browser | Base shown in embed snippets and used by test-submit |
-| `BACKEND_REFRESH_WINDOW_SECONDS` | server | Session lifetime = The Backend's refresh window (604800 today) |
-| `AUTH_REFRESH_AHEAD_SECONDS` | server | Refresh this long before expiry (120) |
-| `SESSION_SECRET` | server | ≥32 chars, seals the cookie and encrypts refresh results in Redis |
-| `REDIS_URL` | server | Refresh coordinator store; required in production, optional in dev (falls back to in-memory) |
-| `NEXT_PUBLIC_PASSWORD_REQUIREMENTS` | browser | Password rules text shown on Account / reset |
-| `E2E_EMAIL`, `E2E_PASSWORD` | tests | Dashboard test user |
-| `E2E_CREATE_USER_CMD`, `E2E_DELETE_USER_CMD` | tests | Shell commands that create/delete a throwaway user (for the Laravel backend: `php artisan user:create …`). Backend-specific, so supplied by env, never in the code |
+
+| Variable                            | Scope     | Purpose                                                                                                                                                                                                                                                                                     |
+| ----------------------------------- | --------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `BACKEND_API_URL`                   | server    | The Backend's API base (e.g. `http://127.0.0.1:8001/api`)                                                                                                                                                                                                                                   |
+| `BACKEND_SPEC_URL`                  | build/dev | OpenAPI spec for type generation and contract tests; derived from `BACKEND_API_URL` if unset                                                                                                                                                                                                |
+| `NEXT_PUBLIC_BACKEND_PUBLIC_URL`    | browser   | Base shown in embed snippets and used by test-submit                                                                                                                                                                                                                                        |
+| `BACKEND_REFRESH_WINDOW_SECONDS`    | server    | Session lifetime = The Backend's refresh window (604800 today)                                                                                                                                                                                                                              |
+| `AUTH_REFRESH_AHEAD_SECONDS`        | server    | Refresh this long before expiry (120)                                                                                                                                                                                                                                                       |
+| `SESSION_SECRET`                    | server    | ≥32 chars, seals the cookie and encrypts refresh results in Redis                                                                                                                                                                                                                           |
+| `REDIS_URL`                         | server    | Refresh coordinator store; required in production, optional in dev (falls back to in-memory)                                                                                                                                                                                                |
+| `NEXT_PUBLIC_PASSWORD_REQUIREMENTS` | browser   | Password rules text shown on Account / reset                                                                                                                                                                                                                                                |
+| `E2E_EMAIL`, `E2E_PASSWORD`         | tests     | Dashboard test user                                                                                                                                                                                                                                                                         |
+| `E2E_CREATE_USER_CMD`               | tests     | Shell command that creates a throwaway user, with `{name}`, `{email}` and `{password}` placeholders (for the reference Backend: `php artisan user:create …`). Backend-specific, so supplied by env, never in the code. Tests delete these users through the contract's `DELETE /v1/auth/me` |
 
 ## 5. Folder layout
 
@@ -159,36 +169,41 @@ form-handler-head-next/
 └─ .env.example, next.config.ts, package.json
 ```
 
-Scripts: `dev`, `build`, `start`, `lint`, `typecheck`, `test`, `test:contract`, `test:e2e`, `api:types`, `check` (lint + format + typecheck + unit), `dev:mock` (runs against the MSW mock backend).
+Scripts: `dev`, `build`, `start`, `lint`, `typecheck`, `test`, `test:contract`, `test:e2e`, `api:types`, `check` (lint + format + typecheck + unit and component tests), and from milestone 2 `dev:mock` (runs against the MSW mock backend).
 
 ## 6. Pages and features
 
 Behaviour matches the Nuxt PRDs; only the Next.js mechanism is noted here.
 
-| Route | Purpose | Next.js notes |
-|---|---|---|
-| `/login` | Email + password, 422 message, link to forgot password, "accounts are created by an admin" note; `?next=` return | Route handler sets cookie; client redirects |
-| `/forgot-password` | Always the same "check your inbox" message | |
-| `/reset-password?token&email` | New password + confirmation, then login | |
-| `/` → `/forms` | | `redirect()` |
-| `/forms` | Table: name, active, entries/unread/spam counts (linking to entries tabs), updated. Active filter tabs, sort, page size 15/25/50/100 in the URL. Row actions: open, duplicate, activate/deactivate, delete with Undo (`restore`) | nuqs; page size remembered in `localStorage` |
-| `/forms/new` | Name + settings; templates Blank / Contact / Newsletter (ULID field ids) | |
-| `/forms/[formId]` | Header (name, optimistic Active switch, Duplicate/Delete menu) and tabs: Entries · Fields · Settings · Notifications · Integrate | Nested layout |
-| `…/entries` | Inbox/Unread/Starred/Spam/Trash with count badges; date range; sort (newest/oldest/spam likelihood); schema-driven columns; inline star; Checking… / Not checked spam state with polling; selection + bulk bar (all bulk actions, ≤100 ids, Undo on delete, stale-selection 422); Trash actions; **Export CSV** + Exports popover | TanStack Table; `refetchInterval` while any row is Checking |
-| `…/entries/[entryId]` | Slide-over detail: full input, IP/location, user agent, referer, spam likelihood/reason/time; marks read; star/read/spam toggles; delete/restore/force; prev/next (`j`/`k`) across pages; polls while the check is pending | **Intercepting + parallel route**, so a direct link renders full page and the list keeps its state |
-| `…/fields` | Schema builder: label, input name (follows label until edited), rule presets (required, email, numeric, url, min/max, one-of), free-text rules, drag/keyboard reorder, read-only ULID; saves `order` renumbered from 1, rules as arrays; warns on rename/remove when entries exist; unsaved-changes guard | @dnd-kit; `beforeunload` + router guard |
-| `…/settings` | Name, active, redirect, message, timezone (`Intl.supportedValuesOf`), domains tags, honeypot toggle/name; sends only set keys; delete with Undo | |
-| `…/notifications` | Email/SMS recipients, enabled switch, delivery-error badge, add/edit modal (email or E.164), remove with Undo | |
-| `…/integrate` | Endpoint + copy, inactive banner, HTML+JS and plain HTML snippets (escaped, honeypot included), test-submit from the browser with no credentials, 422 → fields, allowed-domain warning, "Simulate a bot" | Client component calling `NEXT_PUBLIC_BACKEND_PUBLIC_URL` |
-| `/exports` | All recent exports: form name, filter summary, status/rows, expiry, Download / Try again; polling every 2 s → 10 s after 30 s, paused when hidden | |
-| `/account` | Profile (email-change warning), change password (stays signed in), delete account (password + typed email) | |
+| Route                         | Purpose                                                                                                                                                                                                                                                                                                                           | Next.js notes                                                                                      |
+| ----------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------- |
+| `/login`                      | Email + password, 422 message, link to forgot password, "accounts are created by an admin" note; `?next=` return                                                                                                                                                                                                                  | Route handler sets cookie; client redirects                                                        |
+| `/forgot-password`            | Always the same "check your inbox" message                                                                                                                                                                                                                                                                                        |                                                                                                    |
+| `/reset-password?token&email` | New password + confirmation, then login                                                                                                                                                                                                                                                                                           |                                                                                                    |
+| `/` → `/forms`                |                                                                                                                                                                                                                                                                                                                                   | `redirect()`                                                                                       |
+| `/forms`                      | Table: name, active, entries/unread/spam counts (linking to entries tabs), updated. Active filter tabs, sort, page size 15/25/50/100 in the URL. Row actions: open, duplicate, activate/deactivate, delete with Undo (`restore`)                                                                                                  | nuqs; page size remembered in `localStorage`                                                       |
+| `/forms/new`                  | Name + settings; templates Blank / Contact / Newsletter (ULID field ids)                                                                                                                                                                                                                                                          |                                                                                                    |
+| `/forms/[formId]`             | Header (name, optimistic Active switch, Duplicate/Delete menu) and tabs: Entries · Fields · Settings · Notifications · Integrate                                                                                                                                                                                                  | Nested layout                                                                                      |
+| `…/entries`                   | Inbox/Unread/Starred/Spam/Trash with count badges; date range; sort (newest/oldest/spam likelihood); schema-driven columns; inline star; Checking… / Not checked spam state with polling; selection + bulk bar (all bulk actions, ≤100 ids, Undo on delete, stale-selection 422); Trash actions; **Export CSV** + Exports popover | TanStack Table; `refetchInterval` while any row is Checking                                        |
+| `…/entries/[entryId]`         | Slide-over detail: full input, IP/location, user agent, referer, spam likelihood/reason/time; marks read; star/read/spam toggles; delete/restore/force; prev/next (`j`/`k`) across pages; polls while the check is pending                                                                                                        | **Intercepting + parallel route**, so a direct link renders full page and the list keeps its state |
+| `…/fields`                    | Schema builder: label, input name (follows label until edited), rule presets (required, email, numeric, url, min/max, one-of), free-text rules, drag/keyboard reorder, read-only ULID; saves `order` renumbered from 1, rules as arrays; warns on rename/remove when entries exist; unsaved-changes guard                         | @dnd-kit; `beforeunload` + router guard                                                            |
+| `…/settings`                  | Name, active, redirect, message, timezone (`Intl.supportedValuesOf`), domains tags, honeypot toggle/name; sends only set keys; delete with Undo                                                                                                                                                                                   |                                                                                                    |
+| `…/notifications`             | Email/SMS recipients, enabled switch, delivery-error badge, add/edit modal (email or E.164), remove with Undo                                                                                                                                                                                                                     |                                                                                                    |
+| `…/integrate`                 | Endpoint + copy, inactive banner, HTML+JS and plain HTML snippets (escaped, honeypot included), test-submit from the browser with no credentials, 422 → fields, allowed-domain warning, "Simulate a bot"                                                                                                                          | Client component calling `NEXT_PUBLIC_BACKEND_PUBLIC_URL`                                          |
+| `/exports`                    | All recent exports: form name, filter summary, status/rows, expiry, Download / Try again; polling every 2 s → 10 s after 30 s, paused when hidden                                                                                                                                                                                 |                                                                                                    |
+| `/account`                    | Profile (email-change warning), change password (stays signed in), delete account (password + typed email)                                                                                                                                                                                                                        |                                                                                                    |
 
 Cross-cutting: toasts on every mutation, shared confirm dialog, `error.tsx` / `not-found.tsx` for 403/404, loading skeletons (`loading.tsx` + Suspense), dark mode (`next-themes`), forms disabled until hydration (avoids passwords in the URL on a pre-hydration native submit), WCAG 2.1 AA.
 
 ## 7. Milestones
 
 0. ✅ **Contract & docs** (done 2026-10-02). [`docs/prds/`](docs/prds/README.md) adapts the Nuxt PRDs: Next.js mechanisms, "The Backend" instead of Laravel, and the Nuxt build's lessons written into the requirements (flagged "Lesson from Nuxt"). [`docs/backend-contract.md`](docs/backend-contract.md) is the checklist a replacement backend must meet. Writing it found two harmless spec inaccuracies: create endpoints documented as 200 but returning 201, and schema `rules` documented as array-only. It also found that entry updates are documented as `PUT` only, so this dashboard uses `PUT` (the Nuxt one sends `PATCH`).
-1. **Scaffold.** Next.js + TS strict, Tailwind 4, shadcn/ui init, ESLint/Prettier, Vitest, Playwright, MSW. `api:types` script, `types/models.ts` aliases (and `FormListItem`) with type tests. `.env.example`, `pnpm check`.
+1. ✅ **Scaffold** (done 2026-10-02). Next.js 16.3.8 (React 19.2, App Router, `typedRoutes`), TypeScript 5 strict (plus `noUncheckedIndexedAccess`), Tailwind 4, shadcn/ui (Radix, Nova preset) with zinc/indigo theme tokens, ESLint 9 + Prettier, Vitest (`unit`, `component` and `contract` projects), Playwright, MSW 3. `pnpm api:types` → `types/api.d.ts`; `types/models.ts` aliases with type tests. `lib/env.ts` validates server config with zod, and `instrumentation-node.ts` exits at startup with the list of problems (production also requires `REDIS_URL`). `.env.example`, `pnpm check`.
+   - **Contract suite started:** `pnpm test:contract` checks the spec's endpoints, guest 401s, login/forgot-password/submission error shapes, and (with `E2E_CREATE_USER_CMD`) login, pagination, `per_page` bounds, refresh invalidating the old token, and account deletion. 13 checks pass against the reference Backend. Error bodies are matched loosely, because the reference Backend adds a trace in debug mode.
+   - **Test users:** only creation is backend-specific (`E2E_CREATE_USER_CMD` with `{name}`/`{email}`/`{password}` placeholders); tests delete users through `DELETE /v1/auth/me`, so `E2E_DELETE_USER_CMD` was dropped.
+   - **Findings:** shadcn 4's `cn` helper comes from shadcn's own `cn` package (it replaces `clsx` + `tailwind-merge`). MSW 3 renamed `onUnhandledRequest` to `onUnhandledFrame`; under the old name the option is silently ignored. Next.js compiles `instrumentation.ts` for Edge too, so Node-only startup code is in `instrumentation-node.ts`.
+   - **Tests:** 22 unit and component tests, 13 contract checks, 1 Playwright smoke test. `pnpm build` passes.
+   - **Not done here:** `dev:mock` and the MSW handlers come with milestone 2's auth flow. A development Redis (8, no persistence, localhost only) runs from `compose.yaml` with `pnpm services:up` (added 2026-10-02).
 2. **Backend boundary, auth and BFF.** `lib/backend/*`, iron-session, Redis refresh coordinator (Redis added to the local dev setup), `proxy.ts`, `/api/backend/[...path]`, auth route handlers, login/forgot/reset pages, dashboard layout, placeholder pages. Unit tests for token timing, coordinator and proxy path rules; e2e for login, logout, refresh, expiry.
 3. **Forms.** List, create (templates), header/tabs, settings, activate, duplicate, delete/Undo. `useListQuery` and `DataTable` built here for reuse.
 4. **Fields and Integrate.** Schema builder, snippets, test-submit.
@@ -209,14 +224,14 @@ Cross-cutting: toasts on every mutation, shared confirm dialog, `error.tsx` / `n
 
 ## 9. Risks
 
-| Risk | Mitigation |
-|---|---|
+| Risk                                                                             | Mitigation                                                                                                                                                       |
+| -------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Refresh invalidates the old token, and Server Components can't persist a new one | Refresh only in `proxy.ts` and route handlers; coordinator with 60 s reuse; e2e with `AUTH_REFRESH_AHEAD_SECONDS` above the token TTL so every request refreshes |
-| Concurrent refreshes across instances double-refresh and sign users out | Redis-backed coordinator; a unit test runs two coordinators on one store and checks a single refresh call |
-| Redis unavailable | Fail closed for that request (503 with a retry toast), never refresh without the lock |
-| Signed export links pointing at an internal host | Deployment requirement in §4; e2e checks the link host |
-| "Same API design" drifting between backends | Contract suite (§8) + `docs/backend-contract.md`; adapters confined to `lib/backend/` |
-| Rule syntax is The Backend's validation language | Treated as part of the contract; presets limited to the documented rules; free text passed through unchanged |
+| Concurrent refreshes across instances double-refresh and sign users out          | Redis-backed coordinator; a unit test runs two coordinators on one store and checks a single refresh call                                                        |
+| Redis unavailable                                                                | Fail closed for that request (503 with a retry toast), never refresh without the lock                                                                            |
+| Signed export links pointing at an internal host                                 | Deployment requirement in §4; e2e checks the link host                                                                                                           |
+| "Same API design" drifting between backends                                      | Contract suite (§8) + `docs/backend-contract.md`; adapters confined to `lib/backend/`                                                                            |
+| Rule syntax is The Backend's validation language                                 | Treated as part of the contract; presets limited to the documented rules; free text passed through unchanged                                                     |
 
 ## 10. Decisions (2026-10-02)
 

@@ -1,0 +1,18 @@
+# Development services. Start with `pnpm services:up` (or `docker compose up -d`), stop with
+# `pnpm services:down`. Not for production: Redis has no password and listens on localhost only.
+name: form-handler-head-next
+
+services:
+  redis:
+    image: redis:8-alpine
+    # Shares token refreshes between server instances (lib/session). Keys live for 60 s, so nothing
+    # needs to survive a restart: persistence is off.
+    command: ['redis-server', '--save', '', '--appendonly', 'no']
+    ports:
+      - '127.0.0.1:${REDIS_PORT:-6379}:6379'
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped

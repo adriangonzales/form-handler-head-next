@@ -59,14 +59,14 @@ The forms list is the dashboard's home. From it, account holders see every form 
 
 **FR-5 Settings tab.** `/forms/[formId]/settings` edits:
 
-| Field           | Control                                                     | Notes                                                                                                                                           |
-| --------------- | ----------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
-| Name            | text, required, max 400                                     |                                                                                                                                                 |
-| Success message | textarea, max 2000                                          | Returned to submitters after a successful submission                                                                                            |
-| Redirect URL    | URL input, max 2048                                         | Where the submitter's browser should go after submitting                                                                                        |
-| Timezone        | searchable combobox from `Intl.supportedValuesOf('timeZone')` | Used for submission times in alert emails                                                                                                     |
-| Allowed domains | tag input → `string[]`                                      | Bare hostnames; `*.example.com` covers subdomains. Help text explains that when the list isn't empty, submissions from other sites are rejected |
-| Honeypot        | switch, plus a name input shown when on                     | Leaving the name blank lets The Backend generate one. Once saved, the name in use is shown with a copy button                                   |
+| Field           | Control                                                       | Notes                                                                                                                                           |
+| --------------- | ------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| Name            | text, required, max 400                                       |                                                                                                                                                 |
+| Success message | textarea, max 2000                                            | Returned to submitters after a successful submission                                                                                            |
+| Redirect URL    | URL input, max 2048                                           | Where the submitter's browser should go after submitting                                                                                        |
+| Timezone        | searchable combobox from `Intl.supportedValuesOf('timeZone')` | Used for submission times in alert emails                                                                                                       |
+| Allowed domains | tag input → `string[]`                                        | Bare hostnames; `*.example.com` covers subdomains. Help text explains that when the list isn't empty, submissions from other sites are rejected |
+| Honeypot        | switch, plus a name input shown when on                       | Leaving the name blank lets The Backend generate one. Once saved, the name in use is shown with a copy button                                   |
 
 - The form is react-hook-form with a zod schema mirroring The Backend's limits.
 - Save sends `PUT /v1/forms/{id}` with `name`, `active` and `settings`.

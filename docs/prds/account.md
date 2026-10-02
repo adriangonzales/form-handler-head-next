@@ -59,7 +59,7 @@ The **Account** page lets a signed-in user update their name and email, change t
 - **AC-3:** deleting the account with the wrong password changes nothing. With the right one, the user lands on `/login`, and the old credentials no longer work.
 - **AC-4:** changing to an email that's taken shows the error on the email field.
 
-The e2e tests for this PRD create throwaway users with `E2E_CREATE_USER_CMD` and remove them with `E2E_DELETE_USER_CMD`, so they don't depend on how a backend provisions users.
+The e2e tests for this PRD create throwaway users with `E2E_CREATE_USER_CMD` and delete them through the contract's `DELETE /v1/auth/me`, so the only backend-specific step is creating a user.
 
 ## 7. API dependencies
 

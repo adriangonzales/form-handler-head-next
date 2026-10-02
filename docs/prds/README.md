@@ -27,16 +27,16 @@ The Backend is a Laravel application today (`../form-handler-headless-laravel`),
 
 ## Documents
 
-| PRD                                                         | Scope                                                                                                                | Milestone |
-| ----------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- | --------- |
-| [App Shell & Architecture](app-shell-and-architecture.md)   | Backend boundary, proxy, configuration, layout, navigation, shared UI behaviour, error handling, API types, tooling  | 1, 2, 9   |
-| [Authentication & Session](authentication-and-session.md)   | Login, logout, forgot/reset password, the session cookie, token refresh with Redis, route protection                 | 2         |
-| [Forms](forms.md)                                           | Forms list, create, settings, activate/deactivate, delete/restore, duplicate                                         | 3         |
-| [Form Fields & Integration](form-fields-and-integration.md) | Schema builder, embed snippets, test submission                                                                      | 4         |
-| [Entries](entries.md)                                       | Entry inbox, filters, detail view, triage, bulk actions, trash                                                       | 5         |
-| [Entry Exports](entry-exports.md)                           | Queued CSV export, status polling, signed download, recent exports and the Exports page                              | 6         |
-| [Notifications](notifications.md)                           | Email/SMS alert recipients and delivery errors                                                                       | 7         |
-| [Account](account.md)                                       | Profile, password change, account deletion                                                                           | 8         |
+| PRD                                                         | Scope                                                                                                               | Milestone |
+| ----------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- | --------- |
+| [App Shell & Architecture](app-shell-and-architecture.md)   | Backend boundary, proxy, configuration, layout, navigation, shared UI behaviour, error handling, API types, tooling | 1, 2, 9   |
+| [Authentication & Session](authentication-and-session.md)   | Login, logout, forgot/reset password, the session cookie, token refresh with Redis, route protection                | 2         |
+| [Forms](forms.md)                                           | Forms list, create, settings, activate/deactivate, delete/restore, duplicate                                        | 3         |
+| [Form Fields & Integration](form-fields-and-integration.md) | Schema builder, embed snippets, test submission                                                                     | 4         |
+| [Entries](entries.md)                                       | Entry inbox, filters, detail view, triage, bulk actions, trash                                                      | 5         |
+| [Entry Exports](entry-exports.md)                           | Queued CSV export, status polling, signed download, recent exports and the Exports page                             | 6         |
+| [Notifications](notifications.md)                           | Email/SMS alert recipients and delivery errors                                                                      | 7         |
+| [Account](account.md)                                       | Profile, password change, account deletion                                                                          | 8         |
 
 Milestone 0 (these PRDs and the backend contract) and milestone 9 (polish, accessibility, end-to-end coverage, README) have no PRD of their own. Milestone 10 (running the suite against the mock backend) is covered by [App Shell & Architecture](app-shell-and-architecture.md) FR-15.
 
@@ -65,36 +65,36 @@ Browser ──(sealed session cookie)──▶ Next.js server ──────
 
 The behaviour is the same. These are the mechanisms that differ, and why.
 
-| Concern                  | Nuxt dashboard                                     | This dashboard                                                                                                                   |
-| ------------------------ | -------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
-| Session                  | nuxt-auth-utils                                    | iron-session                                                                                                                     |
-| Refresh during a render  | `$api` copies `Set-Cookie` from SSR calls          | Server Components can't set cookies, so `proxy.ts` refreshes before rendering and Server Components never refresh               |
-| Refresh coordination     | In-memory, per Nitro instance                      | Redis, shared by every instance (decided 2026-10-02)                                                                             |
-| Authenticated proxy path | `/api/v1/**`                                       | `/api/backend/**`                                                                                                                |
-| Backend-specific code    | `server/utils/laravel.ts`                          | Confined to `lib/backend/` (server-only), named for The Backend rather than Laravel                                              |
-| Entry detail             | Child route in a slide-over                        | Intercepting + parallel route: a slide-over from the list, a full page from a direct link                                        |
-| List state in the URL    | `useListQuery` composable                          | `useListQuery` hook on nuqs                                                                                                      |
-| Mock backend             | None                                               | MSW handlers typed from the spec, used by component tests and `pnpm dev:mock`                                                    |
-| Contract tests           | None                                               | `tests/contract/` runs against any backend URL                                                                                   |
-| Test user provisioning   | `php artisan user:create` in `E2E_API_DIR`         | `E2E_CREATE_USER_CMD` / `E2E_DELETE_USER_CMD`, supplied by the environment                                                       |
+| Concern                  | Nuxt dashboard                             | This dashboard                                                                                                    |
+| ------------------------ | ------------------------------------------ | ----------------------------------------------------------------------------------------------------------------- |
+| Session                  | nuxt-auth-utils                            | iron-session                                                                                                      |
+| Refresh during a render  | `$api` copies `Set-Cookie` from SSR calls  | Server Components can't set cookies, so `proxy.ts` refreshes before rendering and Server Components never refresh |
+| Refresh coordination     | In-memory, per Nitro instance              | Redis, shared by every instance (decided 2026-10-02)                                                              |
+| Authenticated proxy path | `/api/v1/**`                               | `/api/backend/**`                                                                                                 |
+| Backend-specific code    | `server/utils/laravel.ts`                  | Confined to `lib/backend/` (server-only), named for The Backend rather than Laravel                               |
+| Entry detail             | Child route in a slide-over                | Intercepting + parallel route: a slide-over from the list, a full page from a direct link                         |
+| List state in the URL    | `useListQuery` composable                  | `useListQuery` hook on nuqs                                                                                       |
+| Mock backend             | None                                       | MSW handlers typed from the spec, used by component tests and `pnpm dev:mock`                                     |
+| Contract tests           | None                                       | `tests/contract/` runs against any backend URL                                                                    |
+| Test user provisioning   | `php artisan user:create` in `E2E_API_DIR` | `E2E_CREATE_USER_CMD`, supplied by the environment; deleted through the API                                       |
 
 ## Cross-cutting status
 
-| Capability                                                                                       | Status                                                                                          |
-| ------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------- |
-| PRDs and backend contract                                                                        | Written (milestone 0, 2026-10-02)                                                               |
-| Project scaffold, config from `.env`, generated API types, lint/format/typecheck/test tooling   | Planned (milestone 1)                                                                           |
-| Backend boundary, login, session, token refresh, route protection, password reset               | Planned (milestone 2)                                                                           |
-| Form management                                                                                  | Planned (milestone 3)                                                                           |
-| Schema builder, embed snippets, test submit                                                      | Planned (milestone 4)                                                                           |
-| Entry inbox and triage                                                                           | Planned (milestone 5)                                                                           |
-| CSV export                                                                                       | Planned (milestone 6)                                                                           |
-| Notification recipients                                                                         | Planned (milestone 7)                                                                           |
-| Account self-service                                                                             | Planned (milestone 8)                                                                           |
-| Accessibility (WCAG 2.1 AA scan), end-to-end happy path, README                                  | Planned (milestone 9)                                                                           |
-| Full suite against the mock backend                                                              | Planned (milestone 10)                                                                          |
-| Sign-up                                                                                          | **Not planned.** The API has no registration; accounts are created by an operator               |
-| Email verification, MFA                                                                          | **Not planned** (email verification decided 2026-10-02). The API doesn't support them           |
+| Capability                                                                                    | Status                                                                                |
+| --------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------- |
+| PRDs and backend contract                                                                     | Written (milestone 0, 2026-10-02)                                                     |
+| Project scaffold, config from `.env`, generated API types, lint/format/typecheck/test tooling | Built (milestone 1, 2026-10-02)                                                       |
+| Backend boundary, login, session, token refresh, route protection, password reset             | Planned (milestone 2)                                                                 |
+| Form management                                                                               | Planned (milestone 3)                                                                 |
+| Schema builder, embed snippets, test submit                                                   | Planned (milestone 4)                                                                 |
+| Entry inbox and triage                                                                        | Planned (milestone 5)                                                                 |
+| CSV export                                                                                    | Planned (milestone 6)                                                                 |
+| Notification recipients                                                                       | Planned (milestone 7)                                                                 |
+| Account self-service                                                                          | Planned (milestone 8)                                                                 |
+| Accessibility (WCAG 2.1 AA scan), end-to-end happy path, README                               | Planned (milestone 9)                                                                 |
+| Full suite against the mock backend                                                           | Planned (milestone 10)                                                                |
+| Sign-up                                                                                       | **Not planned.** The API has no registration; accounts are created by an operator     |
+| Email verification, MFA                                                                       | **Not planned** (email verification decided 2026-10-02). The API doesn't support them |
 
 ## Conventions used in these PRDs
 

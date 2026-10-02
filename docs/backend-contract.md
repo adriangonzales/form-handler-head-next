@@ -19,16 +19,16 @@ Written 2026-10-02 against spec "Headless Form Handler" 0.0.1.
 
 ## Endpoints the dashboard uses
 
-| Area          | Endpoints                                                                                                                                    | Auth   |
-| ------------- | -------------------------------------------------------------------------------------------------------------------------------------------- | ------ |
-| Auth          | `POST /v1/auth/login`, `POST /v1/auth/refresh`, `POST /v1/auth/logout`, `GET /v1/auth/me`                                                    | mixed  |
-| Password      | `POST /v1/auth/forgot-password`, `POST /v1/auth/reset-password`                                                                              | none   |
-| Account       | `PATCH /v1/auth/me`, `PUT /v1/auth/password`, `DELETE /v1/auth/me?password=`                                                                | bearer |
-| Forms         | `GET`/`POST /v1/forms`, `GET`/`PUT`/`DELETE /v1/forms/{form}`, `POST /v1/forms/{form}/restore`, `POST /v1/forms/{form}/duplicate`            | bearer |
-| Entries       | `GET /v1/forms/{form}/entries`, `POST /v1/forms/{form}/entries/bulk`, `GET`/`PUT`/`DELETE /v1/entries/{entry}`, `POST …/restore`, `DELETE …/force` | bearer |
+| Area          | Endpoints                                                                                                                                              | Auth                    |
+| ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ | ----------------------- |
+| Auth          | `POST /v1/auth/login`, `POST /v1/auth/refresh`, `POST /v1/auth/logout`, `GET /v1/auth/me`                                                              | mixed                   |
+| Password      | `POST /v1/auth/forgot-password`, `POST /v1/auth/reset-password`                                                                                        | none                    |
+| Account       | `PATCH /v1/auth/me`, `PUT /v1/auth/password`, `DELETE /v1/auth/me?password=`                                                                           | bearer                  |
+| Forms         | `GET`/`POST /v1/forms`, `GET`/`PUT`/`DELETE /v1/forms/{form}`, `POST /v1/forms/{form}/restore`, `POST /v1/forms/{form}/duplicate`                      | bearer                  |
+| Entries       | `GET /v1/forms/{form}/entries`, `POST /v1/forms/{form}/entries/bulk`, `GET`/`PUT`/`DELETE /v1/entries/{entry}`, `POST …/restore`, `DELETE …/force`     | bearer                  |
 | Exports       | `POST /v1/forms/{form}/entries/exports`, `GET /v1/entry-exports`, `GET /v1/entry-exports/{export}`, `GET /v1/entry-exports/{export}/download` (signed) | bearer, except download |
-| Notifications | `GET`/`POST /v1/forms/{form}/notifications`, `GET`/`PUT`/`DELETE /v1/notifications/{notification}`, `POST …/restore`                        | bearer |
-| Submissions   | `POST /v1/forms/{form}/submissions`                                                                                                          | none   |
+| Notifications | `GET`/`POST /v1/forms/{form}/notifications`, `GET`/`PUT`/`DELETE /v1/notifications/{notification}`, `POST …/restore`                                   | bearer                  |
+| Submissions   | `POST /v1/forms/{form}/submissions`                                                                                                                    | none                    |
 
 Not used by the dashboard, and not part of this contract: `POST /v1/forms/{form}/entries` (creating entries through the authenticated API) and `POST /v1/webhooks/postmark/bounces` (the reference implementation's mail provider webhook).
 
@@ -55,15 +55,15 @@ Configuration the dashboard must mirror: the refresh window (`BACKEND_REFRESH_WI
 
 _Relied on by `lib/backend/errors.ts`, `lib/form-errors.ts`._
 
-| Status | Body                                       | Meaning                                                               |
-| ------ | ------------------------------------------ | --------------------------------------------------------------------- |
-| 401    | `{message}`                                | Missing, invalid or expired token                                     |
-| 403    | `{message}`                                | The resource belongs to someone else; inactive form or domain not allowed on submission; bad export signature |
-| 404    | `{message}`                                | Not found, including soft-deleted resources fetched one at a time      |
-| 409    | `{message}`                                | Export download not ready                                             |
-| 410    | `{message}`                                | Export expired                                                        |
-| 422    | `{message, errors: { "path": string[] }}`  | Validation. Paths use dot notation: `settings.honeypot_name`, `schema.2.name`, `ids.3` |
-| 429    | `{message}` + `Retry-After` (seconds)      | Throttled                                                             |
+| Status | Body                                      | Meaning                                                                                                       |
+| ------ | ----------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
+| 401    | `{message}`                               | Missing, invalid or expired token                                                                             |
+| 403    | `{message}`                               | The resource belongs to someone else; inactive form or domain not allowed on submission; bad export signature |
+| 404    | `{message}`                               | Not found, including soft-deleted resources fetched one at a time                                             |
+| 409    | `{message}`                               | Export download not ready                                                                                     |
+| 410    | `{message}`                               | Export expired                                                                                                |
+| 422    | `{message, errors: { "path": string[] }}` | Validation. Paths use dot notation: `settings.honeypot_name`, `schema.2.name`, `ids.3`                        |
+| 429    | `{message}` + `Retry-After` (seconds)     | Throttled                                                                                                     |
 
 ## Successful responses
 
