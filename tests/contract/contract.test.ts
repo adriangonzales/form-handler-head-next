@@ -218,3 +218,199 @@ describe.skipIf(!canCreateUsers)('auth tokens', () => {
     expect(login.status).toBe(422)
   })
 })
+
+describe.skipIf(!canCreateUsers)('forms', () => {
+  let account: Account
+  let other: Account
+  let token: string
+  let otherToken: string
+
+  async function signIn(user: Account) {
+    const response = await call('/v1/auth/login', {
+      method: 'POST',
+      body: JSON.stringify({ email: user.email, password: user.password }),
+    })
+
+    return response.body.access_token as string
+  }
+
+  const createForm = (body: Record<string, unknown>, as = token) =>
+    call('/v1/forms', { method: 'POST', token: as, body: JSON.stringify(body) })
+
+  beforeAll(async () => {
+    account = createThrowawayUser('Contract')
+    other = createThrowawayUser('Contract')
+    token = await signIn(account)
+    otherToken = await signIn(other)
+  })
+
+  afterAll(async () => {
+    for (const [user, userToken] of [
+      [account, token],
+      [other, otherToken],
+    ] as const) {
+      if (userToken) {
+        await call(`/v1/auth/me?password=${encodeURIComponent(user.password)}`, {
+          method: 'DELETE',
+          token: userToken,
+        })
+      }
+    }
+  })
+
+  it('creates an inactive form with 2xx, keeping the schema list sorted by order', async () => {
+    const response = await createForm({
+      name: 'Contract form',
+      schema: [
+        { id: '01k0000000000000000000000b', order: 2, name: 'email', rules: ['required', 'email'] },
+        { id: '01k0000000000000000000000a', order: 1, name: 'name', rules: 'required,max:255' },
+      ],
+    })
+
+    expect(response.status).toBeGreaterThanOrEqual(200)
+    expect(response.status).toBeLessThan(300)
+    expect(response.body.data).toMatchObject({
+      id: expect.any(String),
+      name: 'Contract form',
+      active: false,
+      // Null until settings are sent; after that, every key.
+      settings: null,
+    })
+    expect(response.body.data.schema.map((field: { name: string }) => field.name)).toEqual([
+      'name',
+      'email',
+    ])
+  })
+
+  it('rejects unknown settings keys and field keys with 422s on their paths', async () => {
+    const settings = await createForm({ name: 'Bad', settings: { colour: 'red' } })
+    const schema = await createForm({
+      name: 'Bad',
+      schema: [{ id: '01k0000000000000000000000a', order: 1, colour: 'red' }],
+    })
+
+    expect(settings.status).toBe(422)
+    expect(Object.keys(settings.body.errors)).toContain('settings')
+    expect(schema.status).toBe(422)
+    expect(Object.keys(schema.body.errors).some((key) => key.startsWith('schema.0'))).toBe(true)
+  })
+
+  it('reports an invalid domain on its index', async () => {
+    const response = await createForm({
+      name: 'Bad',
+      settings: { domains: ['example.com', 'https://example.com/path'] },
+    })
+
+    expect(response.status).toBe(422)
+    expect(Object.keys(response.body.errors)).toContain('settings.domains.1')
+  })
+
+  it('generates a honeypot name, and rejects one that clashes with a field', async () => {
+    const generated = await createForm({ name: 'Honeypot', settings: { honeypot_enabled: true } })
+
+    expect(generated.body.data.settings).toEqual({
+      redirect: null,
+      timezone: null,
+      domains: expect.toBeOneOf([null, []]),
+      message: null,
+      honeypot_enabled: true,
+      honeypot_name: expect.stringMatching(/^[A-Za-z0-9_-]+$/),
+    })
+
+    const clash = await createForm({
+      name: 'Clash',
+      schema: [{ id: '01k0000000000000000000000a', order: 1, name: 'email' }],
+      settings: { honeypot_enabled: true, honeypot_name: 'email' },
+    })
+
+    expect(clash.status).toBe(422)
+    expect(Object.keys(clash.body.errors)).toContain('settings.honeypot_name')
+  })
+
+  it('requires name and active on update', async () => {
+    const { body } = await createForm({ name: 'Update me' })
+    const missing = await call(`/v1/forms/${body.data.id}`, {
+      method: 'PUT',
+      token,
+      body: JSON.stringify({ active: true }),
+    })
+    const updated = await call(`/v1/forms/${body.data.id}`, {
+      method: 'PUT',
+      token,
+      body: JSON.stringify({ name: 'Updated', active: true }),
+    })
+
+    expect(missing.status).toBe(422)
+    expect(Object.keys(missing.body.errors)).toContain('name')
+    expect(updated.status).toBe(200)
+    expect(updated.body.data).toMatchObject({ name: 'Updated', active: true })
+  })
+
+  it('lists forms with entry counts, sorted and filtered', async () => {
+    const response = await call('/v1/forms?sort=name&filter[active]=false&per_page=100', {
+      token,
+    })
+    const names = response.body.data.map((form: { name: string }) => form.name)
+
+    expect(response.status).toBe(200)
+    expect(names).toEqual([...names].sort((a, b) => a.localeCompare(b)))
+    expect(names).not.toContain('Updated')
+    expect(response.body.data[0]).toMatchObject({
+      active: false,
+      entries_count: 0,
+      unread_entries_count: 0,
+      spam_entries_count: 0,
+    })
+  })
+
+  it('rejects an unknown sort with a 422', async () => {
+    expect((await call('/v1/forms?sort=colour', { token })).status).toBe(422)
+  })
+
+  it('soft-deletes a form, answering 404 until it is restored', async () => {
+    const { body } = await createForm({ name: 'Delete me' })
+    const id = body.data.id
+
+    expect((await call(`/v1/forms/${id}`, { method: 'DELETE', token })).status).toBe(204)
+    expect((await call(`/v1/forms/${id}`, { token })).status).toBe(404)
+
+    const restored = await call(`/v1/forms/${id}/restore`, { method: 'POST', token })
+
+    expect(restored.status).toBe(200)
+    expect(restored.body.data).toMatchObject({ id, name: 'Delete me' })
+    expect((await call(`/v1/forms/${id}`, { token })).status).toBe(200)
+  })
+
+  it('duplicates a form as a new, inactive one', async () => {
+    const { body } = await createForm({
+      name: 'Original',
+      schema: [{ id: '01k0000000000000000000000a', order: 1, name: 'email' }],
+      settings: { message: 'Thanks' },
+    })
+
+    await call(`/v1/forms/${body.data.id}`, {
+      method: 'PUT',
+      token,
+      body: JSON.stringify({ name: 'Original', active: true }),
+    })
+
+    const copy = await call(`/v1/forms/${body.data.id}/duplicate`, { method: 'POST', token })
+
+    expect(copy.status).toBeGreaterThanOrEqual(200)
+    expect(copy.status).toBeLessThan(300)
+    expect(copy.body.data.id).not.toBe(body.data.id)
+    expect(copy.body.data).toMatchObject({
+      name: expect.stringContaining('Original'),
+      active: false,
+      schema: [expect.objectContaining({ name: 'email' })],
+      settings: expect.objectContaining({ message: 'Thanks' }),
+    })
+  })
+
+  it("answers 403 for someone else's form and 404 for an unknown one", async () => {
+    const { body } = await createForm({ name: 'Private' })
+
+    expect((await call(`/v1/forms/${body.data.id}`, { token: otherToken })).status).toBe(403)
+    expect((await call(`/v1/forms/${madeUpUlid}`, { token })).status).toBe(404)
+  })
+})

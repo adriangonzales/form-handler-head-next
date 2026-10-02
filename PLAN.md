@@ -113,7 +113,7 @@ Nothing outside `lib/backend/` imports the generated `api.d.ts` paths directly; 
 
 - Pages are Server Components that read the session and the route params, prefetch the first page of data through `lib/backend` with TanStack Query's `HydrationBoundary`, and render client components.
 - Client components fetch and mutate through `/api/backend/**` with TanStack Query. One `queryKeys.ts` factory; mutations invalidate the affected keys.
-- No Server Actions for API mutations in v1: one client path (the proxy) keeps error handling, 401 handling and optimistic updates uniform. Revisit after milestone 3.
+- No Server Actions for API mutations in v1: one client path (the proxy) keeps error handling, 401 handling and optimistic updates uniform. Revisited after milestone 3 (see §7): no reason to change.
 
 ### Export downloads
 
@@ -216,7 +216,19 @@ Cross-cutting: toasts on every mutation, shared confirm dialog, `error.tsx` / `n
    - **Checked by hand:** Redis stopped mid-session gives 503 in 0.4 s and the session survives; `next start` sets a `Secure` cookie and Redis holds only hashed keys.
    - **Fixes found while building:** the in-memory store's `setIfAbsent` awaited between check and set, so concurrent callers all took the lock (now synchronous). shadcn's `use-mobile` hook set state in an effect (now `useSyncExternalStore`).
    - **Not verified end to end:** the emailed reset link (needs a real reset email), and the refresh window ending (covered by `tokenAction` unit tests).
-3. **Forms.** List, create (templates), header/tabs, settings, activate, duplicate, delete/Undo. `useListQuery` and `DataTable` built here for reuse.
+3. ✅ **Forms** (built 2026-10-02). List, create (templates), header/tabs, settings, activate, duplicate, delete/Undo. `useListQuery` and `DataTable` built here for reuse.
+   - **Data layer:** TanStack Query 5 (`lib/query-client.ts`, `lib/query-keys.ts`), with the providers (query client, nuqs, theme, tooltips, sonner) in `app/providers.tsx`. Server Components fetch through `lib/backend/forms.ts` and seed a per-request query client that `HydrationBoundary` passes down, so first views don't show a loading state. Browser calls are in `lib/forms/queries.ts`; `hooks/use-form-actions.ts` holds activate (optimistic), duplicate and delete with Undo for the list, the header and the Settings tab.
+   - **Lists:** `lib/list-query.ts` (parse/serialise, ported from Nuxt) + `lib/backend/query.ts` (the contract's `page`/`per_page`/`sort`/`filter[…]`) + `hooks/use-list-query.ts` (nuqs, `history: push`, page size remembered in `localStorage`). `components/shared/data-table.tsx` uses **TanStack Table 9** (`useTable` + `tableFeatures`; v8's `useReactTable` is gone), with sorting and pagination left to The Backend.
+   - **Form pages:** `/forms/new`, and `/forms/[formId]/layout.tsx`, which fetches the form (cached per request with React `cache`, shared with `generateMetadata`) and renders the header and tab links. Settings is built; Entries, Fields, Notifications and Integrate are placeholders until their milestones.
+   - **403:** `forbidden()` with `forbidden.tsx`, behind Next's experimental `authInterrupts` flag, instead of `error.tsx`: in production `error.tsx` only gets a digest, so it can't tell a 403 from other errors. Missing forms use `notFound()`. Both have `forms/`-level files, so they render inside the dashboard shell, and answer 404/403.
+   - **Unsaved changes:** `useUnsavedChanges` covers `beforeunload` and in-app link clicks (caught in the capture phase, before Next's `Link`). The App Router has no navigation events to cancel, so browser back/forward isn't guarded.
+   - **Mock backend:** forms CRUD, list sort/filter, soft delete/restore, duplicate, settings validation (unknown keys, domains per index, honeypot generation and clash), and 403 for other users' forms.
+   - **Contract suite:** 10 forms checks added (23 in total). All pass against the mock and the reference Backend.
+   - **Tests:** 110 unit and component tests (plus 2 Redis tests when `REDIS_URL` is set). 25 Playwright tests (13 auth, 12 forms) pass against the reference Backend with Redis. Against the mock, 24 pass; the entry-counts test needs public submissions and entries, which the mock gets in milestones 4–5.
+   - **Backend fix found by the contract suite:** `POST /v1/forms` answered `active: null` for a new form (the model didn't load the column's database default after `create()`). Fixed in The Backend on 2026-10-02. The dashboard never cached the create response, so it wasn't affected.
+   - **Contract clarified:** `settings` is `null` on a form whose settings were never sent; once sent, every key is present (`docs/backend-contract.md`).
+   - **Known noise in dev:** sonner flushes toasts with `flushSync` in a timer, which React warns about when that timer lands mid-render; next-themes' inline script triggers a React warning on the 404/403 pages. Neither affects behaviour.
+   - **Server Actions (FR-6 open question):** not adopted. Optimistic updates, Undo and 422 mapping all worked through the proxy without special cases.
 4. **Fields and Integrate.** Schema builder, snippets, test-submit.
 5. **Entries.** List, tabs, detail slide-over, bulk actions, trash, spam-check polling.
 6. **Exports.** Export CSV, popover, `/exports`, polling, fresh-link download, 409/410 handling.

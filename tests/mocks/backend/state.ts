@@ -1,5 +1,6 @@
 import { randomBytes } from 'node:crypto'
 import type { User } from '../../../types/models'
+import type { MockForm } from './forms'
 
 interface MockUser extends User {
   password: string
@@ -25,6 +26,8 @@ export class MockBackendState {
   private readonly users = new Map<number, MockUser>()
   private readonly tokens = new Map<string, IssuedToken>()
   private nextUserId = 1
+  /** Every form, including soft-deleted ones, by ID. */
+  readonly forms = new Map<string, MockForm>()
 
   constructor(readonly options: MockBackendOptions) {}
 
@@ -55,6 +58,10 @@ export class MockBackendState {
 
   deleteUser(id: number) {
     this.users.delete(id)
+
+    for (const [formId, form] of this.forms) {
+      if (form.user_id === id) this.forms.delete(formId)
+    }
 
     for (const [token, issued] of this.tokens) {
       if (issued.userId === id) this.tokens.delete(token)
@@ -106,6 +113,11 @@ export class MockBackendState {
 
   revoke(token: string | undefined) {
     if (token) this.tokens.delete(token)
+  }
+
+  /** The current time as the contract's ISO 8601 UTC string. */
+  timestamp(): string {
+    return new Date(this.options.now()).toISOString().replace(/\.(\d{3})Z$/, '.$1000Z')
   }
 
   checkPassword(userId: number, password: string): boolean {

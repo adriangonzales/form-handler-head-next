@@ -1,6 +1,6 @@
 # PRD: Forms
 
-**Status:** Planned (milestone 3) · **Owner area:** `app/(dashboard)/forms/page.tsx`, `app/(dashboard)/forms/new/page.tsx`, `app/(dashboard)/forms/[formId]/layout.tsx`, `app/(dashboard)/forms/[formId]/settings/page.tsx`, `components/forms/*`, `components/shared/DataTable.tsx`, `hooks/useListQuery.ts`, `hooks/useUnsavedChanges.ts`, `lib/forms/*` (`settings.ts`, `templates.ts`, `queries.ts`)
+**Status:** Built (milestone 3, 2026-10-02) · **Owner area:** `app/(dashboard)/forms/page.tsx`, `app/(dashboard)/forms/new/page.tsx`, `app/(dashboard)/forms/[formId]/layout.tsx`, `app/(dashboard)/forms/[formId]/settings/page.tsx`, `components/forms/*`, `components/shared/data-table.tsx`, `hooks/use-list-query.ts`, `hooks/use-unsaved-changes.ts`, `hooks/use-form-actions.ts`, `lib/forms/*` (`settings.ts`, `templates.ts`, `queries.ts`), `lib/backend/forms.ts`
 
 ## 1. Summary
 
@@ -56,6 +56,7 @@ The forms list is the dashboard's home. From it, account holders see every form 
 - Every `/forms/[formId]` tab shows the form name, an **Active** switch, and a menu with Duplicate and Delete.
 - Turning the switch on or off sends `PUT /v1/forms/{id}` with the current `name` and the new `active`. Update requires both (_Backend Forms FR-4_), so the request always includes the current name.
 - The switch updates optimistically (TanStack Query `onMutate`), and reverts with an error toast if the request fails.
+- **As built:** the toast reads "“Name” is accepting submissions" / "is not accepting submissions", from the switch and from the list's Activate/Deactivate.
 
 **FR-5 Settings tab.** `/forms/[formId]/settings` edits:
 
@@ -73,6 +74,7 @@ The forms list is the dashboard's home. From it, account holders see every form 
 - `settings` contains only the keys the user has set, because omitted keys take their defaults and unknown keys are rejected.
 - A 422 on `settings.*` (including a honeypot name that clashes with a field's input name) shows on the matching control.
 - The form warns before the user leaves with unsaved changes (`useUnsavedChanges`: `beforeunload` for reloads and tab closes, and a confirm on in-app link clicks).
+  - **As built:** browser back/forward isn't guarded. The App Router has no navigation event to cancel, so only link clicks (caught before Next's `Link` handles them) and unloads are.
 
 **FR-6 Delete and restore.**
 
@@ -86,6 +88,8 @@ The forms list is the dashboard's home. From it, account holders see every form 
 - The toast says that the copy is inactive and doesn't include entries or recipients (_Backend Forms FR-10_).
 
 **FR-8 Deleted or foreign forms.** A form that's deleted or doesn't exist (404) shows the not-found page; one that belongs to someone else (403) shows the access-denied page ([App Shell](app-shell-and-architecture.md) FR-13). The `[formId]` layout fetches the form on the server, so this happens before any tab renders.
+
+- **As built:** `notFound()` and `forbidden()` (Next's experimental `authInterrupts`), rendered by `app/(dashboard)/forms/not-found.tsx` and `forbidden.tsx` inside the dashboard shell, with HTTP status 404 and 403.
 
 ## 5. Acceptance criteria
 

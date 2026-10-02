@@ -1,6 +1,6 @@
 # PRD: App Shell & Architecture
 
-**Status:** Partly built. Milestone 1 (2026-10-02): configuration (FR-1), generated types (FR-2), tooling. Milestone 2 (2026-10-02): the backend boundary (FR-3), proxy (FR-4, FR-5), layouts and navigation (FR-7), validation errors (FR-12), basic error pages (FR-13), and the mock backend's auth endpoints with the contract suite passing against it (FR-15). Planned: TanStack Query data fetching (FR-6, milestone 3), form tabs (FR-8), toasts and confirmation (FR-10, FR-11), the 403 page (FR-13), polish (9), and the full mock-backend run (10)
+**Status:** Partly built. Milestone 1 (2026-10-02): configuration (FR-1), generated types (FR-2), tooling. Milestone 2 (2026-10-02): the backend boundary (FR-3), proxy (FR-4, FR-5), layouts and navigation (FR-7), validation errors (FR-12), basic error pages (FR-13), and the mock backend's auth endpoints with the contract suite passing against it (FR-15). Milestone 3 (2026-10-02): TanStack Query data fetching with server prefetch (FR-6), form tabs (FR-8), toasts with Undo (FR-10), the 403 page (FR-13), and the mock backend's form endpoints. Planned: `ConfirmDialog` (FR-11, first needed for permanent deletes in milestone 5), polish (9), and the full mock-backend run (10)
 
 ## 1. Summary
 
@@ -104,8 +104,9 @@ This PRD covers the foundation every feature builds on:
 
 **FR-13 Error pages.**
 
-- `not-found.tsx` renders 404 ("Not found"). A 403 renders "You don't have access to this" through `error.tsx`, which also renders a generic error with a way back to `/forms`. `global-error.tsx` covers the root layout.
-- Server Components translate a `BackendError` 404 into `notFound()` and a 403 into the access-denied error.
+- `not-found.tsx` renders 404 ("Not found"). A 403 renders "You don't have access to this" through `forbidden.tsx`. `error.tsx` renders a generic error with a way back to `/forms`. `global-error.tsx` covers the root layout.
+- Server Components translate a `BackendError` 404 into `notFound()` and a 403 into `forbidden()`.
+- **As built (milestone 3):** `forbidden()` needs Next's experimental `authInterrupts` flag. It's used because `error.tsx` only receives a digest in production, so it can't tell a 403 from any other error. `app/(dashboard)/forms/` has its own `not-found.tsx` and `forbidden.tsx`, so a missing or foreign form renders inside the dashboard shell.
 - A 401 at any point sends the user to `/login?next=<current path>`.
 
 **FR-14 Rate limiting.** A 429 shows The Backend's message, without retrying automatically.
@@ -152,4 +153,4 @@ This PRD covers the foundation every feature builds on:
 
 ## 8. Open questions
 
-1. Should mutations move to Server Actions after milestone 3, once the proxy-based pattern has been used in anger?
+1. Should mutations move to Server Actions after milestone 3, once the proxy-based pattern has been used in anger? **Milestone 3 finding:** optimistic updates, Undo toasts and 422 mapping all worked through the proxy without special cases, so there's no reason to switch yet.

@@ -117,7 +117,7 @@ _Relied on by `lib/forms/`, `lib/schema/`._
 ### Form settings
 
 - `settings` keys, all optional and nullable, defaulting when left out; unknown keys → 422: `redirect` (URL), `timezone` (IANA name), `domains` (string[] of bare hostnames, `*.` prefix for subdomains), `message`, `honeypot_enabled` (bool), `honeypot_name` (generated when the honeypot is on and no name is given; must not clash with a field's input name).
-- Responses always include every key.
+- `settings` is `null` on a form whose settings were never sent. Once sent, responses always include every key.
 
 ## Public submissions
 

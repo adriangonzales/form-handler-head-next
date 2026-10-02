@@ -67,7 +67,7 @@ The Redis tests in `tests/unit/redis-refresh-store.test.ts` run when `REDIS_URL`
 
 ## The mock backend
 
-`tests/mocks/backend/` is an in-memory implementation of [the contract](docs/backend-contract.md), built with MSW. It grows with each feature. `pnpm dev:mock` runs the dashboard against it; sign in as `demo@example.com` / `password`. To check the dashboard and the contract suite against it:
+`tests/mocks/backend/` is an in-memory implementation of [the contract](docs/backend-contract.md), built with MSW. It grows with each feature: today it covers auth and forms (not yet submissions, entries, exports or notifications). `pnpm dev:mock` runs the dashboard against it; sign in as `demo@example.com` / `password`. To check the dashboard and the contract suite against it:
 
 ```sh
 pnpm mock:backend

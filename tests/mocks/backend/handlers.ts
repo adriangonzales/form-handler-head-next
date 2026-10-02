@@ -1,4 +1,15 @@
 import { http, HttpResponse, type RequestHandler } from 'msw'
+import {
+  checkHoneypot,
+  formListItem,
+  formResource,
+  formSorts,
+  type MockForm,
+  newFormId,
+  sortForms,
+  validateSchema,
+  validateSettings,
+} from './forms'
 import { MockBackendState } from './state'
 
 // A mock of The Backend that follows docs/backend-contract.md, for `pnpm dev:mock` and for running
@@ -11,6 +22,23 @@ const invalid = (errors: Record<string, string[]>) =>
     { message: Object.values(errors)[0]?.[0] ?? 'The given data was invalid.', errors },
     { status: 422 },
   )
+
+const notFound = () => HttpResponse.json({ message: 'Not found.' }, { status: 404 })
+
+const forbidden = () =>
+  HttpResponse.json({ message: 'This action is unauthorized.' }, { status: 403 })
+
+function add(errors: Record<string, string[]>, key: string, message: string) {
+  ;(errors[key] ??= []).push(message)
+}
+
+function checkName(name: unknown, errors: Record<string, string[]>) {
+  if (typeof name !== 'string' || name.trim() === '') {
+    add(errors, 'name', 'The name field is required.')
+  } else if (name.length > 400) {
+    add(errors, 'name', 'The name field must not be greater than 400 characters.')
+  }
+}
 
 function bearer(request: Request): string | undefined {
   return request.headers.get('authorization')?.match(/^Bearer (.+)$/)?.[1]
@@ -88,6 +116,28 @@ export function createMockBackend(options: {
   const state =
     options.state ??
     new MockBackendState({ tokenTtlSeconds: 3600, refreshWindowSeconds: 604_800, now: Date.now })
+
+  /**
+   * Runs `handle` for the signed-in user's form: 401 for guests, 404 for unknown (or, unless
+   * `withTrashed`, deleted) forms, and 403 for someone else's.
+   */
+  function withForm(
+    request: Request,
+    id: unknown,
+    handle: (form: MockForm) => Response | Promise<Response>,
+    options: { withTrashed?: boolean } = {},
+  ) {
+    const user = state.authenticate(bearer(request))
+
+    if (!user) return unauthenticated()
+
+    const form = state.forms.get(String(id).toLowerCase())
+
+    if (!form || (form.deleted_at !== null && !options.withTrashed)) return notFound()
+    if (form.user_id !== user.id) return forbidden()
+
+    return handle(form)
+  }
 
   const handlers: RequestHandler[] = [
     // Mock-only: creates a user, standing in for a backend's own provisioning (E2E_CREATE_USER_CMD).
@@ -173,14 +223,141 @@ export function createMockBackend(options: {
     ),
 
     http.get(`${api}/forms`, ({ request }) => {
-      if (!state.authenticate(bearer(request))) return unauthenticated()
+      const user = state.authenticate(bearer(request))
+
+      if (!user) return unauthenticated()
 
       const perPage = perPageFrom(request)
 
-      return perPage instanceof Response
-        ? perPage
-        : HttpResponse.json(paginate(request, [], perPage))
+      if (perPage instanceof Response) return perPage
+
+      const params = new URL(request.url).searchParams
+      const sort = params.get('sort') ?? '-updated_at'
+      const active = params.get('filter[active]')
+
+      if (!formSorts.includes(sort)) return invalid({ sort: ['The selected sort is invalid.'] })
+      if (active !== null && !['true', 'false', '1', '0'].includes(active)) {
+        return invalid({ 'filter.active': ['The selected filter.active is invalid.'] })
+      }
+
+      const forms = [...state.forms.values()].filter(
+        (form) =>
+          form.user_id === user.id &&
+          form.deleted_at === null &&
+          (active === null || form.active === (active === 'true' || active === '1')),
+      )
+
+      return HttpResponse.json(paginate(request, sortForms(forms, sort).map(formListItem), perPage))
     }),
+
+    http.post(`${api}/forms`, async ({ request }) => {
+      const user = state.authenticate(bearer(request))
+
+      if (!user) return unauthenticated()
+
+      const body = await jsonBody(request)
+      const errors: Record<string, string[]> = {}
+
+      checkName(body.name, errors)
+
+      const schema = validateSchema(body.schema, errors)
+      const settings = validateSettings(body.settings, errors)
+
+      checkHoneypot(settings, schema, null, body.settings !== undefined, errors)
+
+      if (Object.keys(errors).length > 0) return invalid(errors)
+
+      const at = state.timestamp()
+      const form: MockForm = {
+        id: newFormId(),
+        user_id: user.id,
+        name: body.name as string,
+        active: false,
+        schema,
+        settings,
+        created_at: at,
+        updated_at: at,
+        deleted_at: null,
+      }
+
+      state.forms.set(form.id, form)
+
+      return HttpResponse.json({ data: formResource(form) }, { status: 201 })
+    }),
+
+    http.get(`${api}/forms/:form`, ({ request, params }) =>
+      withForm(request, params.form, (form) => HttpResponse.json({ data: formResource(form) })),
+    ),
+
+    http.put(`${api}/forms/:form`, ({ request, params }) =>
+      withForm(request, params.form, async (form) => {
+        const body = await jsonBody(request)
+        const errors: Record<string, string[]> = {}
+
+        checkName(body.name, errors)
+
+        if (typeof body.active !== 'boolean') {
+          add(errors, 'active', 'The active field is required and must be true or false.')
+        }
+
+        const schema = 'schema' in body ? validateSchema(body.schema, errors) : form.schema
+        const settings =
+          'settings' in body ? validateSettings(body.settings, errors) : form.settings
+
+        checkHoneypot(settings, schema, form.settings, 'settings' in body, errors)
+
+        if (Object.keys(errors).length > 0) return invalid(errors)
+
+        Object.assign(form, {
+          name: body.name,
+          active: body.active,
+          schema,
+          settings,
+          updated_at: state.timestamp(),
+        })
+
+        return HttpResponse.json({ data: formResource(form) })
+      }),
+    ),
+
+    http.delete(`${api}/forms/:form`, ({ request, params }) =>
+      withForm(request, params.form, (form) => {
+        form.deleted_at = state.timestamp()
+
+        return new HttpResponse(null, { status: 204 })
+      }),
+    ),
+
+    http.post(`${api}/forms/:form/restore`, ({ request, params }) =>
+      withForm(
+        request,
+        params.form,
+        (form) => {
+          form.deleted_at = null
+
+          return HttpResponse.json({ data: formResource(form) })
+        },
+        { withTrashed: true },
+      ),
+    ),
+
+    http.post(`${api}/forms/:form/duplicate`, ({ request, params }) =>
+      withForm(request, params.form, (form) => {
+        const at = state.timestamp()
+        const copy: MockForm = {
+          ...structuredClone(form),
+          id: newFormId(),
+          name: `${form.name.slice(0, 393)} (copy)`,
+          active: false,
+          created_at: at,
+          updated_at: at,
+        }
+
+        state.forms.set(copy.id, copy)
+
+        return HttpResponse.json({ data: formResource(copy) }, { status: 201 })
+      }),
+    ),
 
     http.post(`${api}/forms/:form/submissions`, () =>
       HttpResponse.json({ message: 'Not found.' }, { status: 404 }),
