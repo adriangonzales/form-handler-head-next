@@ -67,6 +67,37 @@ export class MockBackendState {
     return [...this.users.values()].find((user) => user.email === email.toLowerCase())
   }
 
+  /** Changes the name or email; a new email clears its verification, as the contract says. */
+  updateUser(id: number, changes: { name?: string; email?: string }): User | undefined {
+    const user = this.users.get(id)
+
+    if (!user) return undefined
+
+    if (changes.name !== undefined) user.name = changes.name
+    if (changes.email !== undefined && changes.email.toLowerCase() !== user.email) {
+      user.email = changes.email.toLowerCase()
+      user.email_verified_at = null
+    }
+
+    user.updated_at = this.timestamp()
+
+    return publicUser(user)
+  }
+
+  /** Sets a new password and revokes every token the user has. */
+  changePassword(id: number, password: string) {
+    const user = this.users.get(id)
+
+    if (!user) return
+
+    user.password = password
+    user.updated_at = this.timestamp()
+
+    for (const [token, issued] of this.tokens) {
+      if (issued.userId === id) this.tokens.delete(token)
+    }
+  }
+
   deleteUser(id: number) {
     this.users.delete(id)
 

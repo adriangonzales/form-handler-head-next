@@ -351,6 +351,86 @@ export function createMockBackend(options: {
       return user ? HttpResponse.json({ data: user }) : unauthenticated()
     }),
 
+    http.patch(`${api}/auth/me`, async ({ request }) => {
+      const user = state.authenticate(bearer(request))
+
+      if (!user) return unauthenticated()
+
+      const body = await jsonBody(request)
+      const errors: Record<string, string[]> = {}
+
+      // "sometimes": a key that's present is validated, even when it's null or empty.
+      if ('name' in body) {
+        if (isBlankValue(body.name)) add(errors, 'name', 'The name field is required.')
+        else if (typeof body.name !== 'string')
+          add(errors, 'name', 'The name field must be a string.')
+        else if (body.name.length > 255) {
+          add(errors, 'name', 'The name field must not be greater than 255 characters.')
+        }
+      }
+
+      if ('email' in body) {
+        const email = body.email
+
+        if (isBlankValue(email)) add(errors, 'email', 'The email field is required.')
+        else if (typeof email !== 'string' || !/^[^\s@]+@[^\s@]+$/.test(email)) {
+          add(errors, 'email', 'The email field must be a valid email address.')
+        } else if (email.length > 255) {
+          add(errors, 'email', 'The email field must not be greater than 255 characters.')
+        } else if ((state.findUserByEmail(email)?.id ?? user.id) !== user.id) {
+          add(errors, 'email', 'The email has already been taken.')
+        }
+      }
+
+      if (Object.keys(errors).length > 0) return invalid(errors)
+
+      return HttpResponse.json({
+        data: state.updateUser(user.id, {
+          name: typeof body.name === 'string' ? body.name : undefined,
+          email: typeof body.email === 'string' ? body.email : undefined,
+        }),
+      })
+    }),
+
+    http.put(`${api}/auth/password`, async ({ request }) => {
+      const user = state.authenticate(bearer(request))
+
+      if (!user) return unauthenticated()
+
+      const body = await jsonBody(request)
+      const current = body.current_password
+      const password = body.password
+      const errors: Record<string, string[]> = {}
+
+      if (isBlankValue(current)) {
+        add(errors, 'current_password', 'The current password field is required.')
+      } else if (typeof current !== 'string' || !state.checkPassword(user.id, current)) {
+        add(errors, 'current_password', 'The password is incorrect.')
+      }
+
+      // The reference Backend's policy outside production: at least 8 characters.
+      if (isBlankValue(password)) add(errors, 'password', 'The password field is required.')
+      else if (typeof password !== 'string') {
+        add(errors, 'password', 'The password field must be a string.')
+      } else {
+        if (password !== body.password_confirmation) {
+          add(errors, 'password', 'The password field confirmation does not match.')
+        }
+        if (password === current) {
+          add(errors, 'password', 'The password field and current password must be different.')
+        }
+        if (password.length < 8) {
+          add(errors, 'password', 'The password field must be at least 8 characters.')
+        }
+      }
+
+      if (Object.keys(errors).length > 0) return invalid(errors)
+
+      state.changePassword(user.id, String(password))
+
+      return HttpResponse.json(state.issueToken(user.id))
+    }),
+
     http.delete(`${api}/auth/me`, ({ request }) => {
       const user = state.authenticate(bearer(request))
 

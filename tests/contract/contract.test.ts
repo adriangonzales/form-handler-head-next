@@ -219,6 +219,130 @@ describe.skipIf(!canCreateUsers)('auth tokens', () => {
   })
 })
 
+describe.skipIf(!canCreateUsers)('account', () => {
+  let account: Account
+  let other: Account
+  let token: string
+  let otherToken: string
+
+  async function signIn(user: Account) {
+    const response = await call('/v1/auth/login', {
+      method: 'POST',
+      body: JSON.stringify({ email: user.email, password: user.password }),
+    })
+
+    return response.body.access_token as string
+  }
+
+  beforeAll(async () => {
+    account = createThrowawayUser('Contract')
+    other = createThrowawayUser('Contract')
+    token = await signIn(account)
+    otherToken = await signIn(other)
+  })
+
+  afterAll(async () => {
+    for (const [user, userToken] of [
+      [account, token],
+      [other, otherToken],
+    ] as const) {
+      if (userToken) {
+        await call(`/v1/auth/me?password=${encodeURIComponent(user.password)}`, {
+          method: 'DELETE',
+          token: userToken,
+        })
+      }
+    }
+  })
+
+  const patchMe = (body: Record<string, unknown>) =>
+    call('/v1/auth/me', { method: 'PATCH', token, body: JSON.stringify(body) })
+
+  const changePassword = (body: Record<string, unknown>) =>
+    call('/v1/auth/password', { method: 'PUT', token, body: JSON.stringify(body) })
+
+  it('changes only the name when only the name is sent', async () => {
+    const response = await patchMe({ name: 'Renamed Contract' })
+
+    expect(response.status).toBe(200)
+    expect(response.body.data).toMatchObject({ name: 'Renamed Contract', email: account.email })
+  })
+
+  it("refuses another user's email with a 422 on email", async () => {
+    const response = await patchMe({ email: other.email })
+
+    expect(response.status).toBe(422)
+    expect(Object.keys(response.body.errors)).toEqual(['email'])
+  })
+
+  it('changes the email and clears its verification', async () => {
+    const email = `renamed-${account.email}`
+    const response = await patchMe({ email })
+
+    expect(response.status).toBe(200)
+    expect(response.body.data).toMatchObject({ email, email_verified_at: null })
+    account = { ...account, email }
+  })
+
+  it('refuses a wrong current password with a 422 on current_password', async () => {
+    const password = `${account.password}-New!`
+    const response = await changePassword({
+      current_password: 'wrong-password',
+      password,
+      password_confirmation: password,
+    })
+
+    expect(response.status).toBe(422)
+    expect(Object.keys(response.body.errors)).toContain('current_password')
+  })
+
+  it('refuses a confirmation that does not match with a 422 on password', async () => {
+    const response = await changePassword({
+      current_password: account.password,
+      password: `${account.password}-New!`,
+      password_confirmation: 'something else',
+    })
+
+    expect(response.status).toBe(422)
+    expect(Object.keys(response.body.errors)).toContain('password')
+  })
+
+  it('changes the password, revoking every token and returning a new one', async () => {
+    const password = `${account.password}-New!`
+    const response = await changePassword({
+      current_password: account.password,
+      password,
+      password_confirmation: password,
+    })
+
+    expect(response.status).toBe(200)
+    expect(response.body).toEqual({
+      access_token: expect.any(String),
+      token_type: 'bearer',
+      expires_in: expect.any(Number),
+    })
+
+    const old = token
+    const oldPassword = account.password
+
+    token = response.body.access_token
+    account = { ...account, password }
+
+    expect((await call('/v1/auth/me', { token: old })).status).toBe(401)
+    expect((await call('/v1/auth/refresh', { method: 'POST', token: old })).status).toBe(401)
+    expect((await call('/v1/auth/me', { token })).status).toBe(200)
+
+    const login = (password: string) =>
+      call('/v1/auth/login', {
+        method: 'POST',
+        body: JSON.stringify({ email: account.email, password }),
+      })
+
+    expect((await login(oldPassword)).status).toBe(422)
+    expect((await login(password)).status).toBe(200)
+  })
+})
+
 describe.skipIf(!canCreateUsers)('forms', () => {
   let account: Account
   let other: Account

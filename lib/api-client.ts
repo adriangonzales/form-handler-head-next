@@ -42,16 +42,21 @@ export async function apiRequest<T = unknown>(path: string, init: RequestInit = 
   return body as T
 }
 
-/**
- * Calls The Backend through the authenticated proxy (`/api/backend/**`). A 401 means the session
- * is over, so the user is sent to the login page with a way back here.
- */
+/** Calls The Backend through the authenticated proxy (`/api/backend/**`). */
 export async function backendRequest<T = unknown>(
   path: `/${string}`,
   init?: RequestInit,
 ): Promise<T> {
+  return sessionRequest<T>(`/api/backend${path}`, init)
+}
+
+/**
+ * Calls one of this app's routes that needs the session (`/api/backend/**`, the account routes).
+ * A 401 means the session is over, so the user is sent to the login page with a way back here.
+ */
+export async function sessionRequest<T = unknown>(path: string, init?: RequestInit): Promise<T> {
   try {
-    return await apiRequest<T>(`/api/backend${path}`, init)
+    return await apiRequest<T>(path, init)
   } catch (error) {
     if (error instanceof ApiError && error.status === 401) {
       window.location.assign(

@@ -49,6 +49,18 @@ export async function withBackendToken<T extends { response: Response }>(
   request: Request,
   call: (token: string, forwardedFor: string | undefined) => Promise<T>,
 ): Promise<T> {
+  return (await withBackendSession(request, call)).result
+}
+
+/**
+ * withBackendToken, also returning the session the call was made with (refreshed and saved if it
+ * needed to be). Route handlers that change the session start from this one, not from
+ * getSession(), so they never save a token that was refreshed away.
+ */
+export async function withBackendSession<T extends { response: Response }>(
+  request: Request,
+  call: (token: string, forwardedFor: string | undefined) => Promise<T>,
+): Promise<{ result: T; session: Session }> {
   const forwardedFor = clientIp(request.headers)
   const session = await getSession()
 
@@ -67,7 +79,7 @@ export async function withBackendToken<T extends { response: Response }>(
     throw unauthenticated()
   }
 
-  return result
+  return { result, session: current }
 }
 
 async function usableSession(

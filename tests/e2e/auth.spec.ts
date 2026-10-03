@@ -24,11 +24,11 @@ test('wrong credentials show the message on the email field', async ({ page }) =
 test('signing in returns to the requested page and survives a reload', async ({ page }) => {
   await signIn(page, '/account')
 
-  await expect(page.getByText(e2eUser().email)).toBeVisible()
+  await expect(page.getByLabel('Email', { exact: true })).toHaveValue(e2eUser().email)
 
   await page.reload()
   await expect(page).toHaveURL('/account')
-  await expect(page.getByText(e2eUser().email)).toBeVisible()
+  await expect(page.getByLabel('Email', { exact: true })).toHaveValue(e2eUser().email)
 })
 
 test('a signed-in user visiting the login page goes to their forms', async ({ page }) => {
@@ -65,7 +65,7 @@ test('parallel requests share one token refresh', async ({ page }) => {
   expect(responses.map((response) => response.status())).toEqual(Array(10).fill(200))
 
   await page.goto('/account')
-  await expect(page.getByText(e2eUser().email)).toBeVisible()
+  await expect(page.getByLabel('Email', { exact: true })).toHaveValue(e2eUser().email)
 })
 
 test('a page render after a refresh uses the new token and sends the new cookie', async ({
