@@ -1,6 +1,5 @@
-import { ComingSoon } from '@/components/shared/coming-soon'
+import { SchemaBuilder } from '@/components/forms/schema-builder'
 
-// Placeholder: arrives in milestone 4.
-export default function FieldsPage() {
-  return <ComingSoon title="Fields">The field builder for this form arrives here.</ComingSoon>
+export default async function FieldsPage({ params }: PageProps<'/forms/[formId]/fields'>) {
+  return <SchemaBuilder formId={(await params).formId} />
 }

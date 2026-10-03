@@ -126,7 +126,7 @@ _Relied on by `lib/snippets.ts`, `components/forms/TestSubmit.tsx`._
 - `POST /v1/forms/{form}/submissions`, no auth, JSON or form-encoded.
 - **CORS:** allowed from any origin, without credentials.
 - Body keys are the schema's input names, validated with each field's rules. Unknown keys are dropped. Only validated fields are stored.
-- 201 `{redirect, message}` from the form's settings. **Never a 3xx.**
+- 201 `{ data: { redirect, message } }` from the form's settings. **Never a 3xx.**
 - Inactive form → 403. `Referer` host not in a non-empty `domains` list → 403. Validation → 422. Throttled → 429.
 - A filled honeypot input still returns 201, and stores the entry flagged as spam.
 - After storing, the entry is checked for spam **asynchronously**. Alerts go to enabled email recipients only **after** the check, and never for spam.

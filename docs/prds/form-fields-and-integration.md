@@ -1,6 +1,6 @@
 # PRD: Form Fields & Integration
 
-**Status:** Planned (milestone 4) · **Owner area:** `app/(dashboard)/forms/[formId]/fields/page.tsx`, `app/(dashboard)/forms/[formId]/integrate/page.tsx`, `components/forms/SchemaBuilder.tsx`, `components/forms/SchemaFieldRow.tsx`, `components/forms/TestSubmit.tsx`, `components/shared/CodeBlock.tsx`, `hooks/useCopy.ts`, `lib/schema/*`, `lib/snippets.ts`, `lib/ulid.ts`
+**Status:** Built (milestone 4, 2026-10-02) · **Owner area:** `app/(dashboard)/forms/[formId]/fields/page.tsx`, `app/(dashboard)/forms/[formId]/integrate/page.tsx`, `components/forms/schema-builder.tsx`, `components/forms/schema-field-row.tsx`, `components/forms/integrate-panel.tsx`, `components/forms/test-submit.tsx`, `components/shared/code-block.tsx`, `components/shared/tags-input.tsx`, `hooks/use-copy.ts`, `lib/schema/builder.ts`, `lib/snippets.ts`, `lib/ulid.ts`
 
 ## 1. Summary
 
@@ -71,6 +71,7 @@ The Backend rejects a field with any other key, a missing or non-ULID `id`, a re
 - **Save** sends `PUT /v1/forms/{id}` with the current `name`, `active` and the serialised `schema` (`FormSchemaBody`): one `{ id, order, label?, name?, rules? }` per row, leaving out an empty label, empty rules, and a `name` equal to the ID.
 - Input names and IDs are checked in the browser before saving (format and uniqueness), and a 422 on `schema` (for example a field's input name clashing with the honeypot name) shows above the list.
 - The page warns before the user leaves with unsaved changes (`useUnsavedChanges`). "Unsaved" compares the serialised schema, so reordering back to the original isn't a change.
+- **As built:** a 422 on save lists every message The Backend sent above the fields. Each row's key is its field ID, which is unique within a form, so the server and browser render the same ids.
 
 **FR-5 Empty schema.**
 
@@ -109,6 +110,7 @@ The Backend rejects a field with any other key, a missing or non-ULID `id`, a re
   - 403 shows The Backend's message;
   - 429 shows the rate-limit message.
 - A note says the test creates a real entry, and links to the Entries tab.
+- **As built:** a successful test refreshes the form's entry queries and the forms list counts.
 - **Allowed domains:** if the form's allowed-domains list isn't empty and doesn't include the dashboard's host, the test will be rejected, because The Backend checks the `Referer` (_Backend Entries FR-1a_). The tab warns about this before submitting, and suggests temporarily adding the dashboard host or clearing the list.
 - **Honeypot:** the honeypot input is shown in a "Simulate a bot" disclosure. Filling it in demonstrates that the response looks like success, but the entry is flagged as spam.
 - **Spam check:** test entries go through the same spam check as real ones (_Backend Entries FR-1a_). Throwaway content like "test test" may be flagged, which means it lands in Spam and no alert is sent. The success panel says so, and links to both Inbox and Spam. **Sample data** fills the form with a plausible enquiry, to keep false positives down.

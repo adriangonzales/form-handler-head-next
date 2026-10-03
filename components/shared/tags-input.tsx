@@ -5,10 +5,11 @@ import { useState } from 'react'
 import { cn } from '@/lib/utils'
 
 /**
- * A list of hostnames as removable tags. Enter, a comma, leaving the field, or pasting adds what
- * was typed; Backspace in an empty field removes the last one.
+ * A list of short values as removable tags. Enter, a comma, leaving the field, or pasting adds what
+ * was typed; Backspace in an empty field removes the last one. `split` sets what separates values
+ * in typed or pasted text (commas and whitespace by default).
  */
-export function DomainsInput({
+export function TagsInput({
   id,
   value,
   onChange,
@@ -16,6 +17,9 @@ export function DomainsInput({
   invalid,
   describedBy,
   placeholder,
+  listLabel,
+  split = /[\s,]+/,
+  mono = false,
 }: {
   id: string
   value: string[]
@@ -24,13 +28,17 @@ export function DomainsInput({
   invalid?: boolean
   describedBy?: string
   placeholder?: string
+  /** Names the list of added values for screen readers, e.g. "Allowed domains added". */
+  listLabel: string
+  split?: RegExp
+  mono?: boolean
 }) {
   const [draft, setDraft] = useState('')
 
   function add(text: string) {
     const known = new Set(value.map((domain) => domain.toLowerCase()))
     const added = text
-      .split(/[\s,]+/)
+      .split(split)
       .map((domain) => domain.trim())
       .filter((domain) => {
         if (!domain || known.has(domain.toLowerCase())) return false
@@ -50,11 +58,14 @@ export function DomainsInput({
         invalid && 'border-destructive ring-3 ring-destructive/20',
       )}
     >
-      <ul className="contents" aria-label="Allowed domains added">
+      <ul className="contents" aria-label={listLabel}>
         {value.map((domain) => (
           <li
             key={domain}
-            className="flex h-6 items-center gap-1 rounded-md bg-secondary pr-0.5 pl-2 font-mono text-xs"
+            className={cn(
+              'flex h-6 items-center gap-1 rounded-md bg-secondary pr-0.5 pl-2 text-xs',
+              mono && 'font-mono',
+            )}
           >
             {domain}
             <button
@@ -80,7 +91,7 @@ export function DomainsInput({
         className="h-6 min-w-32 flex-1 bg-transparent px-1 text-sm outline-none placeholder:text-muted-foreground"
         onChange={(event) => setDraft(event.target.value)}
         onKeyDown={(event) => {
-          if (event.key === 'Enter' || event.key === ',') {
+          if (event.key === 'Enter' || (event.key === ',' && split.test(','))) {
             event.preventDefault()
             add(draft)
           } else if (event.key === 'Backspace' && draft === '' && value.length > 0) {

@@ -407,6 +407,47 @@ describe.skipIf(!canCreateUsers)('forms', () => {
     })
   })
 
+  it('accepts public submissions as JSON with CORS, keeping only schema fields', async () => {
+    const { body } = await createForm({
+      name: 'Public',
+      schema: [
+        { id: '01k0000000000000000000000a', order: 1, name: 'email', rules: ['required', 'email'] },
+      ],
+      settings: { message: 'Thanks!' },
+    })
+    const id = body.data.id
+    const submit = (data: Record<string, unknown>) =>
+      call(`/v1/forms/${id}/submissions`, {
+        method: 'POST',
+        headers: { Origin: 'https://site.example' },
+        body: JSON.stringify(data),
+      })
+
+    expect((await submit({ email: 'reader@example.com' })).status).toBe(403)
+
+    await call(`/v1/forms/${id}`, {
+      method: 'PUT',
+      token,
+      body: JSON.stringify({ name: 'Public', active: true }),
+    })
+
+    const invalid = await submit({ email: 'not-an-email' })
+    const accepted = await submit({ email: 'reader@example.com', extra: 'dropped' })
+
+    expect(invalid.status).toBe(422)
+    expect(Object.keys(invalid.body.errors)).toEqual(['email'])
+    expect(accepted.status).toBe(201)
+    expect(accepted.body).toEqual({ data: { redirect: null, message: 'Thanks!' } })
+    expect(accepted.headers.get('access-control-allow-origin')).toMatch(
+      /^(\*|https:\/\/site\.example)$/,
+    )
+
+    const entries = await call(`/v1/forms/${id}/entries`, { token })
+
+    expect(entries.body.data).toHaveLength(1)
+    expect(entries.body.data[0].input).toEqual({ email: 'reader@example.com' })
+  })
+
   it("answers 403 for someone else's form and 404 for an unknown one", async () => {
     const { body } = await createForm({ name: 'Private' })
 

@@ -243,9 +243,11 @@ export function formResource(form: MockForm): Form {
   return { ...form }
 }
 
-export function formListItem(form: MockForm): FormListItem {
-  // The mock has no entries yet.
-  return { ...formResource(form), entries_count: 0, unread_entries_count: 0, spam_entries_count: 0 }
+export function formListItem(
+  form: MockForm,
+  counts: Pick<FormListItem, 'entries_count' | 'unread_entries_count' | 'spam_entries_count'>,
+): FormListItem {
+  return { ...formResource(form), ...counts }
 }
 
 /** Sorts by a contract sort (`name`, `-created_at`, …), with the ID as a tie-breaker. */

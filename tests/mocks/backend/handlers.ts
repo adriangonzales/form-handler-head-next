@@ -10,6 +10,7 @@ import {
   validateSchema,
   validateSettings,
 } from './forms'
+import { entryCounts, newEntry, refererAllowed, validateSubmission } from './entries'
 import { MockBackendState } from './state'
 
 // A mock of The Backend that follows docs/backend-contract.md, for `pnpm dev:mock` and for running
@@ -22,6 +23,15 @@ const invalid = (errors: Record<string, string[]>) =>
     { message: Object.values(errors)[0]?.[0] ?? 'The given data was invalid.', errors },
     { status: 422 },
   )
+
+const cors = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'POST',
+  'Access-Control-Allow-Headers': 'content-type, accept',
+}
+
+const isBlankValue = (value: unknown) =>
+  value === undefined || value === null || (typeof value === 'string' && value.trim() === '')
 
 const notFound = () => HttpResponse.json({ message: 'Not found.' }, { status: 404 })
 
@@ -247,7 +257,15 @@ export function createMockBackend(options: {
           (active === null || form.active === (active === 'true' || active === '1')),
       )
 
-      return HttpResponse.json(paginate(request, sortForms(forms, sort).map(formListItem), perPage))
+      return HttpResponse.json(
+        paginate(
+          request,
+          sortForms(forms, sort).map((form) =>
+            formListItem(form, entryCounts(state.entriesOf(form.id))),
+          ),
+          perPage,
+        ),
+      )
     }),
 
     http.post(`${api}/forms`, async ({ request }) => {
@@ -359,9 +377,88 @@ export function createMockBackend(options: {
       }),
     ),
 
-    http.post(`${api}/forms/:form/submissions`, () =>
-      HttpResponse.json({ message: 'Not found.' }, { status: 404 }),
+    // Public submissions: no auth, and CORS from any origin without credentials.
+    http.options(
+      `${api}/forms/:form/submissions`,
+      () => new HttpResponse(null, { status: 204, headers: cors }),
     ),
+
+    http.post(`${api}/forms/:form/submissions`, async ({ request, params }) => {
+      const form = state.forms.get(String(params.form).toLowerCase())
+      const respond = (body: Parameters<typeof HttpResponse.json>[0], status: number) =>
+        HttpResponse.json(body, { status, headers: cors })
+
+      if (!form || form.deleted_at !== null) return respond({ message: 'Not found.' }, 404)
+      if (!form.active) return respond({ message: 'This action is unauthorized.' }, 403)
+      if (!refererAllowed(request.headers.get('referer'), form.settings?.domains ?? null)) {
+        return respond({ message: 'Submissions are not accepted from this domain.' }, 403)
+      }
+
+      const body = await jsonBody(request)
+      const errors: Record<string, string[]> = {}
+      const input = validateSubmission(form.schema, body, errors)
+
+      if (Object.keys(errors).length > 0) {
+        return respond({ message: Object.values(errors)[0]![0], errors }, 422)
+      }
+
+      const honeypot = form.settings?.honeypot_enabled ? form.settings.honeypot_name : null
+      const entry = newEntry(form, input, request, {
+        at: state.timestamp(),
+        honeypotTripped: Boolean(honeypot && !isBlankValue(body[honeypot])),
+      })
+
+      state.entries.set(entry.id, entry)
+
+      return respond(
+        {
+          data: {
+            redirect: form.settings?.redirect ?? null,
+            message: form.settings?.message ?? null,
+          },
+        },
+        201,
+      )
+    }),
+
+    http.get(`${api}/forms/:form/entries`, ({ request, params }) =>
+      withForm(request, params.form, (form) => {
+        const perPage = perPageFrom(request)
+
+        if (perPage instanceof Response) return perPage
+
+        const trashed = new URL(request.url).searchParams.get('filter[trashed]')
+        const entries = state
+          .entriesOf(form.id)
+          .filter((entry) =>
+            trashed === 'with'
+              ? true
+              : trashed === 'only'
+                ? entry.deleted_at !== null
+                : entry.deleted_at === null,
+          )
+          .sort((a, b) => (a.id < b.id ? 1 : -1))
+
+        return HttpResponse.json(paginate(request, entries, perPage))
+      }),
+    ),
+
+    http.put(`${api}/entries/:entry`, async ({ request, params }) => {
+      const entry = state.entries.get(String(params.entry).toLowerCase())
+
+      if (!entry) return notFound()
+
+      return withForm(request, entry.form_id, async () => {
+        const body = await jsonBody(request)
+
+        if ('read_at' in body) entry.read_at = (body.read_at as string | null) ?? null
+        if ('spam' in body) entry.spam = (body.spam as boolean | null) ?? null
+        if ('starred' in body) entry.starred = Boolean(body.starred)
+        entry.updated_at = state.timestamp()
+
+        return HttpResponse.json({ data: entry })
+      })
+    }),
 
     // Anything else under the API answers like the contract: 401 for guests, 404 otherwise.
     http.all(`${api}/*`, ({ request }) =>

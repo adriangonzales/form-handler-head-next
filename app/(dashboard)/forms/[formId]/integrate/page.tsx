@@ -1,10 +1,5 @@
-import { ComingSoon } from '@/components/shared/coming-soon'
+import { IntegratePanel } from '@/components/forms/integrate-panel'
 
-// Placeholder: arrives in milestone 4.
-export default function IntegratePage() {
-  return (
-    <ComingSoon title="Integrate">
-      The endpoint, embed snippets and a test submission tool arrive here.
-    </ComingSoon>
-  )
+export default async function IntegratePage({ params }: PageProps<'/forms/[formId]/integrate'>) {
+  return <IntegratePanel formId={(await params).formId} />
 }

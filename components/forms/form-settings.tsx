@@ -27,6 +27,7 @@ import {
   InputGroupButton,
   InputGroupInput,
 } from '@/components/ui/input-group'
+import { TagsInput } from '@/components/shared/tags-input'
 import { Switch } from '@/components/ui/switch'
 import { Textarea } from '@/components/ui/textarea'
 import { useCopy } from '@/hooks/use-copy'
@@ -43,7 +44,6 @@ import {
 } from '@/lib/forms/settings'
 import { queryKeys } from '@/lib/query-keys'
 import type { Form } from '@/types/models'
-import { DomainsInput } from './domains-input'
 import { TimezoneSelect } from './timezone-select'
 
 // Mirrors The Backend's limits, so most mistakes show before anything is sent.
@@ -241,7 +241,7 @@ function SettingsEditor({ form: saved }: { form: Form }) {
                     control={form.control}
                     name="settings.domains"
                     render={({ field }) => (
-                      <DomainsInput
+                      <TagsInput
                         id="domains"
                         value={field.value}
                         onChange={field.onChange}
@@ -249,6 +249,8 @@ function SettingsEditor({ form: saved }: { form: Form }) {
                         invalid={!!domainsError}
                         describedBy="domains-help"
                         placeholder="example.com"
+                        listLabel="Allowed domains added"
+                        mono
                       />
                     )}
                   />

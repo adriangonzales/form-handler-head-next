@@ -11,4 +11,11 @@ export const queryKeys = {
     list: (query: ApiQuery) => [...queryKeys.forms.lists(), query] as const,
     detail: (id: string) => [...queryKeys.forms.all, 'detail', id] as const,
   },
+  entries: {
+    all: ['entries'] as const,
+    /** Everything about one form's entries: lists, counts. */
+    form: (formId: string) => [...queryKeys.entries.all, 'form', formId] as const,
+    /** How many entries a form has, deleted ones included. */
+    total: (formId: string) => [...queryKeys.entries.form(formId), 'total'] as const,
+  },
 }

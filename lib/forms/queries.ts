@@ -79,3 +79,14 @@ export async function duplicateForm(id: string): Promise<Form> {
 
   return data
 }
+
+/** How many entries a form has, including deleted ones: they keep their input names too. */
+export function entryTotalQuery(formId: string) {
+  return queryOptions({
+    queryKey: queryKeys.entries.total(formId),
+    queryFn: () =>
+      backendRequest<Paginated<unknown>>(
+        `${formPath(formId)}/entries${toSearch({ per_page: 1, 'filter[trashed]': 'with' })}`,
+      ).then(({ meta }) => meta.total),
+  })
+}
