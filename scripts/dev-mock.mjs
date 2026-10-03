@@ -2,18 +2,9 @@
 // The mock answers on MOCK_BACKEND_PORT (default 8010). Values in .env are overridden where they
 // would point the dashboard elsewhere, and the refresh store is in memory.
 import { spawn } from 'node:child_process'
+import { mockBackendEnv } from './mock-backend-env.mjs'
 
-const port = process.env.MOCK_BACKEND_PORT ?? '8010'
-const apiUrl = `http://127.0.0.1:${port}/api`
-const env = {
-  ...process.env,
-  MOCK_BACKEND_PORT: port,
-  BACKEND_API_URL: apiUrl,
-  NEXT_PUBLIC_BACKEND_PUBLIC_URL: apiUrl,
-  SESSION_SECRET: process.env.SESSION_SECRET || 'mock-backend-session-secret-not-for-real-use',
-  // Empty rather than unset, so Next.js doesn't fill it in from .env: the mock uses the memory store.
-  REDIS_URL: '',
-}
+const env = { ...process.env, ...mockBackendEnv(process.env.MOCK_BACKEND_PORT ?? '8010') }
 
 const children = [
   spawn('pnpm', ['exec', 'tsx', 'scripts/mock-backend.ts'], { env, stdio: 'inherit' }),

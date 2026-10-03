@@ -11,7 +11,7 @@ import {
 } from './support'
 
 // Exports are built in the background: against the reference Backend these tests need its queue
-// worker running (`php artisan queue:work`).
+// worker running (see the README).
 
 const created: string[] = []
 

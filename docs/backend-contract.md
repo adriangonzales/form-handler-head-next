@@ -5,7 +5,9 @@ This is what any backend must implement for this dashboard to work with it. The 
 The dashboard isn't tied to the reference implementation. A backend is ready for it when:
 
 1. it serves an OpenAPI 3.1 spec whose types match the reference spec for every endpoint below, so `pnpm api:types` produces compatible types; and
-2. `pnpm test:contract` passes against it ([App Shell](prds/app-shell-and-architecture.md) FR-15).
+2. `pnpm test:contract` passes against it ([App Shell](prds/app-shell-and-architecture.md) FR-15), and so does `pnpm test:e2e`.
+
+The mock backend in `tests/mocks/backend/` is a second implementation, and both suites pass against it (`pnpm test:contract:mock`, `pnpm test:e2e:mock`). The README's "Using another backend" section has the steps for switching.
 
 Everything here is a behaviour the dashboard relies on. Each section names the module that relies on it, so that a backend that differs in a small way can be adapted in that one place.
 

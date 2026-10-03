@@ -34,20 +34,22 @@ Every variable is documented in [`.env.example`](.env.example).
 
 ## Commands
 
-| Command              | What it does                                                                      |
-| -------------------- | --------------------------------------------------------------------------------- |
-| `pnpm dev`           | Development server                                                                |
-| `pnpm dev:mock`      | Development server against the mock backend (no Backend or Redis needed)          |
-| `pnpm mock:backend`  | Just the mock backend, on `127.0.0.1:8010`                                        |
-| `pnpm build`         | Production build                                                                  |
-| `pnpm start`         | Serve the production build                                                        |
-| `pnpm check`         | Lint, Prettier check, typecheck, unit and component tests (run before committing) |
-| `pnpm test`          | Unit (`tests/unit`) and component (`tests/component`, jsdom + MSW) tests          |
-| `pnpm test:contract` | Check the backend at `BACKEND_API_URL` against the contract                       |
-| `pnpm test:e2e`      | Playwright tests; starts `pnpm dev` unless `E2E_BASE_URL` is set                  |
-| `pnpm api:types`     | Regenerate `types/api.d.ts` from the backend's OpenAPI spec                       |
-| `pnpm services:up`   | Start development services (Redis on `127.0.0.1:6379`) with Docker Compose        |
-| `pnpm services:down` | Stop them                                                                         |
+| Command                   | What it does                                                                      |
+| ------------------------- | --------------------------------------------------------------------------------- |
+| `pnpm dev`                | Development server                                                                |
+| `pnpm dev:mock`           | Development server against the mock backend (no Backend or Redis needed)          |
+| `pnpm mock:backend`       | Just the mock backend, on `127.0.0.1:8010`                                        |
+| `pnpm build`              | Production build                                                                  |
+| `pnpm start`              | Serve the production build                                                        |
+| `pnpm check`              | Lint, Prettier check, typecheck, unit and component tests (run before committing) |
+| `pnpm test`               | Unit (`tests/unit`) and component (`tests/component`, jsdom + MSW) tests          |
+| `pnpm test:contract`      | Check the backend at `BACKEND_API_URL` against the contract                       |
+| `pnpm test:e2e`           | Playwright tests; starts `pnpm dev` unless `E2E_BASE_URL` is set                  |
+| `pnpm test:contract:mock` | The contract suite against a fresh mock backend (no Backend needed)               |
+| `pnpm test:e2e:mock`      | The Playwright tests against a fresh mock backend (no Backend or Redis needed)    |
+| `pnpm api:types`          | Regenerate `types/api.d.ts` from the backend's OpenAPI spec                       |
+| `pnpm services:up`        | Start development services (Redis on `127.0.0.1:6379`) with Docker Compose        |
+| `pnpm services:down`      | Stop them                                                                         |
 
 ## Tests against a backend
 
@@ -69,12 +71,25 @@ The Redis tests in `tests/unit/redis-refresh-store.test.ts` run when `REDIS_URL`
 
 ## The mock backend
 
-`tests/mocks/backend/` is an in-memory implementation of [the contract](docs/backend-contract.md), built with MSW. It grows with each feature: today it covers auth, forms, public submissions, entries, exports, notification recipients and account changes (profile, password, deletion). It also has mock-only helpers: `POST /__mock/notifications/{id}/bounce` records a delivery problem on a recipient, and `GET /__mock/alerts` lists the alerts it has "sent". `pnpm dev:mock` runs the dashboard against it; sign in as `demo@example.com` / `password`. To check the dashboard and the contract suite against it:
+`tests/mocks/backend/` is an in-memory implementation of [the contract](docs/backend-contract.md), built with MSW and sharing no code with the reference Backend. It covers every endpoint the dashboard uses. It also has mock-only helpers:
 
-```sh
-pnpm mock:backend
-BACKEND_API_URL=http://127.0.0.1:8010/api pnpm test:contract
-```
+- `POST /__mock/users` creates a user;
+- `POST /__mock/notifications/{id}/bounce` records a delivery problem on a recipient;
+- `GET /__mock/alerts` lists the alerts it has "sent".
+
+`pnpm dev:mock` runs the dashboard against it (port 8010); sign in as `demo@example.com` / `password`.
+
+`pnpm test:contract:mock` and `pnpm test:e2e:mock` run the contract suite and the Playwright tests against a fresh mock on port 8011 (`MOCK_BACKEND_PORT`). They override `.env` where it would point elsewhere, and need no Backend, Redis or test-user command. Both suites pass against the mock and against the reference Backend, which is the evidence that the dashboard depends on the contract rather than on either implementation.
+
+## Using another backend
+
+The dashboard works with any backend that implements [the contract](docs/backend-contract.md). To switch to one:
+
+1. **Check the contract.** Run `BACKEND_API_URL=https://new-backend.example/api pnpm test:contract`. Without a test-user command, only the public checks run (endpoints, guest 401s, error shapes). Set `E2E_CREATE_USER_CMD` to a shell command that creates a user on the new backend, with `{name}`, `{email}` and `{password}` placeholders, and the signed-in checks run too. Fix the backend until all of them pass.
+2. **Regenerate the types.** Run `BACKEND_SPEC_URL=https://new-backend.example/docs/api.json pnpm api:types`, then `pnpm typecheck`. A type error shows where the new spec differs from the old one. `git diff types/api.d.ts` shows the whole change.
+3. **Adapt, if a convention differs.** Each convention the dashboard relies on is handled in exactly one module, listed in [`PLAN.md`](PLAN.md) §2. Backend-specific code goes in `lib/backend/`. A unit test fails if a backend framework is named anywhere else.
+4. **Configure.** Point `BACKEND_API_URL` and `NEXT_PUBLIC_BACKEND_PUBLIC_URL` at the new backend, and set `BACKEND_REFRESH_WINDOW_SECONDS` and `NEXT_PUBLIC_PASSWORD_REQUIREMENTS` to match its policy. Then rebuild. On the backend, set the reset-email link, CORS, the trusted proxy and its public origin, as listed under [Deploying](#deploying).
+5. **Run the end-to-end tests** with `pnpm test:e2e`, using the same `E2E_CREATE_USER_CMD`, and with any background workers the backend needs (exports must complete).
 
 ## Deploying
 

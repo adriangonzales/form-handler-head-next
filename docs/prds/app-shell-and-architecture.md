@@ -1,6 +1,6 @@
 # PRD: App Shell & Architecture
 
-**Status:** Partly built. Milestone 1 (2026-10-02): configuration (FR-1), generated types (FR-2), tooling. Milestone 2 (2026-10-02): the backend boundary (FR-3), proxy (FR-4, FR-5), layouts and navigation (FR-7), validation errors (FR-12), basic error pages (FR-13), and the mock backend's auth endpoints with the contract suite passing against it (FR-15). Milestone 3 (2026-10-02): TanStack Query data fetching with server prefetch (FR-6), form tabs (FR-8), toasts with Undo (FR-10), the 403 page (FR-13), and the mock backend's form endpoints. Milestone 5 (2026-10-02): `useConfirm` for permanent deletes (FR-11), and row selection in `DataTable`. Milestone 9 (2026-10-03): `loading.tsx` skeletons (FR-9), the dashboard error page and Retry (FR-13), and the accessibility scan with its fixes (NFR-4, NFR-5). Planned: the full mock-backend run (10)
+**Status:** Built. Milestone 1 (2026-10-02): configuration (FR-1), generated types (FR-2), tooling. Milestone 2 (2026-10-02): the backend boundary (FR-3), proxy (FR-4, FR-5), layouts and navigation (FR-7), validation errors (FR-12), basic error pages (FR-13), and the mock backend's auth endpoints with the contract suite passing against it (FR-15). Milestone 3 (2026-10-02): TanStack Query data fetching with server prefetch (FR-6), form tabs (FR-8), toasts with Undo (FR-10), the 403 page (FR-13), and the mock backend's form endpoints. Milestone 5 (2026-10-02): `useConfirm` for permanent deletes (FR-11), and row selection in `DataTable`. Milestone 9 (2026-10-03): `loading.tsx` skeletons (FR-9), the dashboard error page and Retry (FR-13), and the accessibility scan with its fixes (NFR-4, NFR-5). Milestone 10 (2026-10-03): the full Playwright suite against the mock in one command, CI, and the NFR-7 check (FR-15, NFR-7).
 
 ## 1. Summary
 
@@ -120,6 +120,7 @@ This PRD covers the foundation every feature builds on:
 - Component tests use the mock. `pnpm dev:mock` runs the dashboard against it, so frontend work can continue with The Backend offline.
 - `tests/contract/` checks the contract's conventions against any `BACKEND_API_URL`. It runs against the mock on every push, and against The Backend in the e2e job. A new backend is ready for this dashboard when it passes.
 - Milestone 10 runs the Playwright suite against the mock as well as The Backend.
+- **As built (milestone 10):** `pnpm test:contract:mock` and `pnpm test:e2e:mock` start a fresh mock (`scripts/with-mock-backend.mjs`), point the run at it whatever `.env` says (`scripts/mock-backend-env.mjs`, shared with `pnpm dev:mock`), and stop it afterwards. All 46 contract checks and 71 Playwright tests pass against both the mock and The Backend, and no test skips or branches by backend. CI (`.github/workflows/ci.yml`) runs `pnpm check` and both suites against the mock on every push, with no Backend, Redis or secrets. A copy of the project with no `.env` passed all three locally; the workflow hasn't run on GitHub yet. The README's "Using another backend" section is the checklist for switching.
 
 ## 5. Non-functional requirements
 
@@ -148,6 +149,7 @@ This PRD covers the foundation every feature builds on:
   - **As built (milestone 9):** the Entries status tabs were 392 px wide at 375 px, so the page scrolled sideways; they now scroll inside their own container.
 - **NFR-6 Theming:** light and dark mode with `next-themes`, without a flash of the wrong theme on load. Primary colour indigo, neutral zinc, to match the Nuxt dashboard.
 - **NFR-7 Independence:** no file outside `lib/backend/`, `.env.example` and the README names a backend framework.
+  - **As built (milestone 10):** `tests/unit/backend-independence.test.ts` checks every tracked or new file for framework names (Laravel, artisan, PHP, Eloquent, Symfony, Django). Exempt: `lib/backend/`, `.env.example`, Markdown docs (which describe the reference Backend on purpose), and the types generated from its spec. It found three comments in the tests (an `artisan` command, and the mock's notes on Laravel and PHP behaviour), which now refer to the reference Backend instead. No app code named one.
 
 ## 6. Acceptance criteria
 

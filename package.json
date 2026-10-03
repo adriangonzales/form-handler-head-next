@@ -19,7 +19,9 @@
     "test": "vitest run --project unit --project component",
     "test:watch": "vitest --project unit --project component",
     "test:contract": "vitest run --project contract",
+    "test:contract:mock": "node scripts/with-mock-backend.mjs pnpm test:contract",
     "test:e2e": "playwright test",
+    "test:e2e:mock": "node scripts/with-mock-backend.mjs pnpm test:e2e",
     "api:types": "node --env-file-if-exists=.env scripts/generate-api-types.mjs",
     "check": "pnpm lint && pnpm format:check && pnpm typecheck && pnpm test"
   },

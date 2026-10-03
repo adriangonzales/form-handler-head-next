@@ -92,7 +92,7 @@ The behaviour is the same. These are the mechanisms that differ, and why.
 | Notification recipients                                                                       | Built (milestone 7, 2026-10-03)                                                       |
 | Account self-service                                                                          | Built (milestone 8, 2026-10-03)                                                       |
 | Accessibility (WCAG 2.1 AA scan), end-to-end happy path, README                               | Built (milestone 9, 2026-10-03)                                                       |
-| Full suite against the mock backend                                                           | Planned (milestone 10)                                                                |
+| Full suite against the mock backend                                                           | Built (milestone 10, 2026-10-03)                                                      |
 | Sign-up                                                                                       | **Not planned.** The API has no registration; accounts are created by an operator     |
 | Email verification, MFA                                                                       | **Not planned** (email verification decided 2026-10-02). The API doesn't support them |
 

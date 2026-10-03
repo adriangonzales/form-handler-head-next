@@ -152,7 +152,10 @@ export function exportResource(
   return { ...resource, download_url: downloadUrl }
 }
 
-/** Whether a download link's signature is valid and unexpired, as Laravel's `signed:relative`. */
+/**
+ * Whether a download link's signature is valid and unexpired: an HMAC of the path and expiry time,
+ * leaving out the host, as the reference Backend signs them.
+ */
 export function validSignature(secret: Buffer, url: URL, now: number): boolean {
   const expires = Number(url.searchParams.get('expires'))
   const signature = url.searchParams.get('signature') ?? ''
@@ -254,7 +257,10 @@ function csvDate(value: string | null | undefined): string {
   return value ? new Date(value).toISOString().replace(/\.\d{3}Z$/, 'Z') : ''
 }
 
-/** Formula protection, then PHP's `fputcsv` quoting (it also quotes cells with spaces or tabs). */
+/**
+ * Formula protection, then the reference Backend's CSV quoting, which also quotes cells with spaces
+ * or tabs.
+ */
 function csvCell(value: string): string {
   const safe =
     value !== '' && ['=', '+', '-', '@', '\t', '\r'].includes(value[0]!) ? `'${value}` : value
@@ -262,7 +268,7 @@ function csvCell(value: string): string {
   return /[,"\n\r\t ]/.test(safe) ? `"${safe.replaceAll('"', '""')}"` : safe
 }
 
-/** Like Laravel's `Str::slug` for plain text: lowercase ASCII words joined by hyphens. */
+/** Lowercase ASCII words joined by hyphens, as the reference Backend names export files. */
 function slug(text: string): string {
   return text
     .normalize('NFKD')
