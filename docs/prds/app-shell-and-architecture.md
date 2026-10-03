@@ -1,6 +1,6 @@
 # PRD: App Shell & Architecture
 
-**Status:** Partly built. Milestone 1 (2026-10-02): configuration (FR-1), generated types (FR-2), tooling. Milestone 2 (2026-10-02): the backend boundary (FR-3), proxy (FR-4, FR-5), layouts and navigation (FR-7), validation errors (FR-12), basic error pages (FR-13), and the mock backend's auth endpoints with the contract suite passing against it (FR-15). Milestone 3 (2026-10-02): TanStack Query data fetching with server prefetch (FR-6), form tabs (FR-8), toasts with Undo (FR-10), the 403 page (FR-13), and the mock backend's form endpoints. Planned: `ConfirmDialog` (FR-11, first needed for permanent deletes in milestone 5), polish (9), and the full mock-backend run (10)
+**Status:** Partly built. Milestone 1 (2026-10-02): configuration (FR-1), generated types (FR-2), tooling. Milestone 2 (2026-10-02): the backend boundary (FR-3), proxy (FR-4, FR-5), layouts and navigation (FR-7), validation errors (FR-12), basic error pages (FR-13), and the mock backend's auth endpoints with the contract suite passing against it (FR-15). Milestone 3 (2026-10-02): TanStack Query data fetching with server prefetch (FR-6), form tabs (FR-8), toasts with Undo (FR-10), the 403 page (FR-13), and the mock backend's form endpoints. Milestone 5 (2026-10-02): `useConfirm` for permanent deletes (FR-11), and row selection in `DataTable`. Planned: polish (9), and the full mock-backend run (10)
 
 ## 1. Summary
 
@@ -98,7 +98,7 @@ This PRD covers the foundation every feature builds on:
 - Failures other than 422 show an error toast with The Backend's `message`.
 - Destructive actions that can be undone (deleting a form, entry or recipient) offer **Undo** in the toast, which calls the matching `restore` endpoint.
 
-**FR-11 Confirmation.** Actions that can't be undone use a shared `ConfirmDialog` that names what will be lost: permanently deleting entries, deleting the account. Deletes that can be undone (FR-10) don't ask for confirmation.
+**FR-11 Confirmation.** Actions that can't be undone use a shared confirmation (`useConfirm` in `components/shared/confirm-dialog.tsx`, an `AlertDialog`) that names what will be lost: permanently deleting entries, deleting the account. Deletes that can be undone (FR-10) don't ask for confirmation.
 
 **FR-12 Validation errors.** `lib/form-errors.ts` maps a 422 `BackendError` onto react-hook-form fields with `setError`, including nested paths such as `settings.honeypot_name` and `ids.3`. Errors with no matching field go in an alert at the top of the form.
 

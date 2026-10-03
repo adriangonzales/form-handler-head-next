@@ -10,8 +10,18 @@ import {
   validateSchema,
   validateSettings,
 } from './forms'
-import { entryCounts, newEntry, refererAllowed, validateSubmission } from './entries'
+import {
+  applyBulkAction,
+  bulkActions,
+  entryCounts,
+  newEntry,
+  queryEntries,
+  refererAllowed,
+  validateEntryUpdate,
+  validateSubmission,
+} from './entries'
 import { MockBackendState } from './state'
+import type { FormEntry } from '../../../types/models'
 
 // A mock of The Backend that follows docs/backend-contract.md, for `pnpm dev:mock` and for running
 // the contract suite without the reference Backend. Endpoints are added as features need them.
@@ -147,6 +157,32 @@ export function createMockBackend(options: {
     if (form.user_id !== user.id) return forbidden()
 
     return handle(form)
+  }
+
+  /**
+   * Runs `handle` for an entry on one of the signed-in user's forms: 401 for guests, 404 for
+   * unknown (or, unless `withTrashed`, deleted) entries, and 403 for someone else's entries or
+   * entries of a deleted form.
+   */
+  function withEntry(
+    request: Request,
+    id: unknown,
+    handle: (entry: FormEntry) => Response | Promise<Response>,
+    options: { withTrashed?: boolean } = {},
+  ) {
+    const user = state.authenticate(bearer(request))
+
+    if (!user) return unauthenticated()
+
+    const entry = state.entries.get(String(id).toLowerCase())
+
+    if (!entry || (entry.deleted_at !== null && !options.withTrashed)) return notFound()
+
+    const form = state.forms.get(entry.form_id)
+
+    if (!form || form.user_id !== user.id || form.deleted_at !== null) return forbidden()
+
+    return handle(entry)
   }
 
   const handlers: RequestHandler[] = [
@@ -427,38 +463,136 @@ export function createMockBackend(options: {
 
         if (perPage instanceof Response) return perPage
 
-        const trashed = new URL(request.url).searchParams.get('filter[trashed]')
-        const entries = state
-          .entriesOf(form.id)
-          .filter((entry) =>
-            trashed === 'with'
-              ? true
-              : trashed === 'only'
-                ? entry.deleted_at !== null
-                : entry.deleted_at === null,
-          )
-          .sort((a, b) => (a.id < b.id ? 1 : -1))
+        const entries = queryEntries(state.entriesOf(form.id), new URL(request.url).searchParams)
 
-        return HttpResponse.json(paginate(request, entries, perPage))
+        return Array.isArray(entries)
+          ? HttpResponse.json(paginate(request, entries, perPage))
+          : invalid(entries)
       }),
     ),
 
-    http.put(`${api}/entries/:entry`, async ({ request, params }) => {
-      const entry = state.entries.get(String(params.entry).toLowerCase())
+    // Adds an entry as the form's owner: validated like a submission, and not spam-checked.
+    http.post(`${api}/forms/:form/entries`, ({ request, params }) =>
+      withForm(request, params.form, async (form) => {
+        if (!form.active) return forbidden()
 
-      if (!entry) return notFound()
+        const errors: Record<string, string[]> = {}
+        const input = validateSubmission(form.schema, await jsonBody(request), errors)
 
-      return withForm(request, entry.form_id, async () => {
+        if (Object.keys(errors).length > 0) return invalid(errors)
+
+        const entry = newEntry(form, input, request, {
+          at: state.timestamp(),
+          honeypotTripped: false,
+        })
+
+        entry.spam = false
+        state.entries.set(entry.id, entry)
+
+        return HttpResponse.json({ data: entry }, { status: 201 })
+      }),
+    ),
+
+    http.post(`${api}/forms/:form/entries/bulk`, ({ request, params }) =>
+      withForm(request, params.form, async (form) => {
         const body = await jsonBody(request)
+        const action = String(body.action ?? '')
+        const ids = Array.isArray(body.ids) ? body.ids : []
+        const forDeleted = bulkActions.forDeletedEntries.includes(action)
+        const errors: Record<string, string[]> = {}
 
-        if ('read_at' in body) entry.read_at = (body.read_at as string | null) ?? null
-        if ('spam' in body) entry.spam = (body.spam as boolean | null) ?? null
-        if ('starred' in body) entry.starred = Boolean(body.starred)
+        if (![...bulkActions.forEntries, ...bulkActions.forDeletedEntries].includes(action)) {
+          errors.action = ['The selected action is invalid.']
+        }
+
+        if (ids.length < 1 || ids.length > 100) {
+          errors.ids = ['The ids field must have between 1 and 100 items.']
+        }
+
+        const entries = ids.flatMap((id: unknown, index: number) => {
+          const entry = state.entries.get(String(id).toLowerCase())
+
+          if (!entry || entry.form_id !== form.id || (entry.deleted_at !== null) !== forDeleted) {
+            errors[`ids.${index}`] = [`The selected ids.${index} is invalid.`]
+
+            return []
+          }
+
+          return [entry]
+        })
+
+        if (Object.keys(errors).length > 0) return invalid(errors)
+
+        const affected = applyBulkAction(entries, action, state.timestamp(), (entry) =>
+          state.entries.delete(entry.id),
+        )
+
+        return HttpResponse.json({ data: { action, affected } })
+      }),
+    ),
+
+    http.get(`${api}/entries/:entry`, ({ request, params }) =>
+      withEntry(request, params.entry, (entry) => HttpResponse.json({ data: entry })),
+    ),
+
+    http.put(`${api}/entries/:entry`, ({ request, params }) =>
+      withEntry(request, params.entry, async (entry) => {
+        const body = await jsonBody(request)
+        const errors = validateEntryUpdate(body)
+
+        if (Object.keys(errors).length > 0) return invalid(errors)
+
+        for (const key of ['spam', 'spam_score', 'spam_reason', 'starred', 'read_at'] as const) {
+          if (key in body) Object.assign(entry, { [key]: body[key] })
+        }
+
         entry.updated_at = state.timestamp()
 
         return HttpResponse.json({ data: entry })
-      })
-    }),
+      }),
+    ),
+
+    http.delete(`${api}/entries/:entry`, ({ request, params }) =>
+      withEntry(request, params.entry, (entry) => {
+        entry.deleted_at = state.timestamp()
+
+        return new HttpResponse(null, { status: 204 })
+      }),
+    ),
+
+    http.post(`${api}/entries/:entry/restore`, ({ request, params }) =>
+      withEntry(
+        request,
+        params.entry,
+        (entry) => {
+          entry.deleted_at = null
+
+          return HttpResponse.json({ data: entry })
+        },
+        { withTrashed: true },
+      ),
+    ),
+
+    // Only entries already in Trash can be deleted for good.
+    http.delete(`${api}/entries/:entry/force`, ({ request, params }) =>
+      withEntry(
+        request,
+        params.entry,
+        (entry) => {
+          if (entry.deleted_at === null) {
+            return HttpResponse.json(
+              { message: 'Only deleted entries can be permanently deleted.' },
+              { status: 409 },
+            )
+          }
+
+          state.entries.delete(entry.id)
+
+          return new HttpResponse(null, { status: 204 })
+        },
+        { withTrashed: true },
+      ),
+    ),
 
     // Anything else under the API answers like the contract: 401 for guests, 404 otherwise.
     http.all(`${api}/*`, ({ request }) =>

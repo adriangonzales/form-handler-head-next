@@ -455,3 +455,158 @@ describe.skipIf(!canCreateUsers)('forms', () => {
     expect((await call(`/v1/forms/${madeUpUlid}`, { token })).status).toBe(404)
   })
 })
+
+describe.skipIf(!canCreateUsers)('entries', () => {
+  let account: Account
+  let token: string
+  let formId: string
+
+  const addEntry = (message: string) =>
+    call(`/v1/forms/${formId}/entries`, {
+      method: 'POST',
+      token,
+      body: JSON.stringify({ message }),
+    }).then((response) => response.body.data.id as string)
+
+  const list = (query = '') =>
+    call(`/v1/forms/${formId}/entries${query}`, { token }).then((response) => response.body)
+
+  beforeAll(async () => {
+    account = createThrowawayUser('Contract')
+    token = (
+      await call('/v1/auth/login', {
+        method: 'POST',
+        body: JSON.stringify({ email: account.email, password: account.password }),
+      })
+    ).body.access_token
+
+    const form = await call('/v1/forms', {
+      method: 'POST',
+      token,
+      body: JSON.stringify({
+        name: 'Entries',
+        schema: [{ id: '01k0000000000000000000000a', order: 1, name: 'message' }],
+      }),
+    })
+
+    formId = form.body.data.id
+    await call(`/v1/forms/${formId}`, {
+      method: 'PUT',
+      token,
+      body: JSON.stringify({ name: 'Entries', active: true }),
+    })
+  })
+
+  afterAll(async () => {
+    if (token) {
+      await call(`/v1/auth/me?password=${encodeURIComponent(account.password)}`, {
+        method: 'DELETE',
+        token,
+      })
+    }
+  })
+
+  it('adds entries as the owner, sorted oldest first unless asked otherwise', async () => {
+    const first = await addEntry('First')
+    const second = await addEntry('Second')
+
+    const ids = (page: { data: { id: string }[] }) => page.data.map((entry) => entry.id)
+
+    expect(ids(await list())).toEqual([first, second])
+    expect(ids(await list('?sort=-created_at'))).toEqual([second, first])
+    expect((await list()).data[0]).toMatchObject({
+      input: { message: 'First' },
+      spam_score: expect.any(Number),
+      starred: false,
+      read_at: null,
+    })
+  })
+
+  it('updates triage fields with PUT, and rejects changes to submitted data', async () => {
+    const id = await addEntry('Update me')
+    const updated = await call(`/v1/entries/${id}`, {
+      method: 'PUT',
+      token,
+      body: JSON.stringify({ starred: true, read_at: '2026-10-02T10:00:00Z' }),
+    })
+    const rejected = await call(`/v1/entries/${id}`, {
+      method: 'PUT',
+      token,
+      body: JSON.stringify({ input: { message: 'Changed' } }),
+    })
+
+    expect(updated.status).toBe(200)
+    expect(updated.body.data).toMatchObject({ starred: true, read_at: expect.any(String) })
+    expect(rejected.status).toBe(422)
+    expect(Object.keys(rejected.body.errors)).toContain('input')
+  })
+
+  it('filters by tab', async () => {
+    const id = await addEntry('Spammy')
+
+    await call(`/v1/entries/${id}`, { method: 'PUT', token, body: JSON.stringify({ spam: true }) })
+
+    const spam = await list('?filter[spam]=true')
+    const inbox = await list('?filter[spam]=false')
+    const starred = await list('?filter[starred]=true')
+
+    expect(spam.data.map((entry: { id: string }) => entry.id)).toEqual([id])
+    expect(inbox.data.map((entry: { id: string }) => entry.id)).not.toContain(id)
+    expect(starred.meta.total).toBe(1)
+  })
+
+  it('soft-deletes, restores, and only erases entries already in Trash', async () => {
+    const id = await addEntry('Erase me')
+
+    expect((await call(`/v1/entries/${id}/force`, { method: 'DELETE', token })).status).toBe(409)
+    expect((await call(`/v1/entries/${id}`, { method: 'DELETE', token })).status).toBe(204)
+    expect((await call(`/v1/entries/${id}`, { token })).status).toBe(404)
+    expect((await list('?filter[trashed]=only')).data.map((e: { id: string }) => e.id)).toEqual([
+      id,
+    ])
+
+    expect((await call(`/v1/entries/${id}/restore`, { method: 'POST', token })).status).toBe(200)
+    expect((await call(`/v1/entries/${id}`, { token })).status).toBe(200)
+
+    await call(`/v1/entries/${id}`, { method: 'DELETE', token })
+    expect((await call(`/v1/entries/${id}/force`, { method: 'DELETE', token })).status).toBe(204)
+    expect(
+      (await list('?filter[trashed]=with')).data.map((e: { id: string }) => e.id),
+    ).not.toContain(id)
+  })
+
+  it('reports how many entries a bulk action changed, and rejects stale ids on their index', async () => {
+    const ids = [await addEntry('A'), await addEntry('B'), await addEntry('C')]
+
+    await call(`/v1/entries/${ids[0]}`, {
+      method: 'PUT',
+      token,
+      body: JSON.stringify({ starred: true }),
+    })
+
+    const bulk = (action: string, bulkIds: string[]) =>
+      call(`/v1/forms/${formId}/entries/bulk`, {
+        method: 'POST',
+        token,
+        body: JSON.stringify({ action, ids: bulkIds }),
+      })
+
+    expect((await bulk('star', ids)).body).toEqual({ data: { action: 'star', affected: 2 } })
+
+    // Restoring entries that aren't in Trash: each is reported on its index.
+    const stale = await bulk('restore', ids)
+
+    expect(stale.status).toBe(422)
+    expect(Object.keys(stale.body.errors)).toEqual(expect.arrayContaining(['ids.0', 'ids.2']))
+  })
+
+  it('rejects an end date before the start date', async () => {
+    const response = await call(
+      `/v1/forms/${formId}/entries?filter[created_from]=2026-10-05&filter[created_to]=2026-10-01`,
+      { token },
+    )
+
+    expect(response.status).toBe(422)
+    expect(Object.keys(response.body.errors)).toContain('filter.created_to')
+  })
+})

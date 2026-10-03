@@ -17,5 +17,11 @@ export const queryKeys = {
     form: (formId: string) => [...queryKeys.entries.all, 'form', formId] as const,
     /** How many entries a form has, deleted ones included. */
     total: (formId: string) => [...queryKeys.entries.form(formId), 'total'] as const,
+    lists: (formId: string) => [...queryKeys.entries.form(formId), 'list'] as const,
+    list: (formId: string, query: ApiQuery) => [...queryKeys.entries.lists(formId), query] as const,
+    /** The Inbox, Unread and Spam tab badges. */
+    counts: (formId: string) => [...queryKeys.entries.form(formId), 'counts'] as const,
+    detail: (formId: string, id: string) =>
+      [...queryKeys.entries.form(formId), 'detail', id] as const,
   },
 }

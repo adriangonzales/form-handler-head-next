@@ -1,6 +1,6 @@
 # PRD: Entries
 
-**Status:** Planned (milestone 5; Export CSV comes with milestone 6) · **Owner area:** `app/(dashboard)/forms/[formId]/entries/layout.tsx`, `…/entries/page.tsx`, `…/entries/@detail/(.)[entryId]/page.tsx`, `…/entries/@detail/default.tsx`, `…/entries/[entryId]/page.tsx`, `components/entries/*` (`EntryTable`, `EntryFilters`, `EntryBulkBar`, `EntryDetail`), `lib/entries/*` (tabs, spam state, neighbours, bulk actions), `hooks/useNow.ts`
+**Status:** Built (milestone 5, 2026-10-02; Export CSV comes with milestone 6) · **Owner area:** `app/(dashboard)/forms/[formId]/entries/layout.tsx`, `…/entries/page.tsx`, `…/entries/@detail/(.)[entryId]/page.tsx`, `…/entries/@detail/page.tsx`, `…/entries/@detail/default.tsx`, `…/entries/[entryId]/page.tsx`, `components/entries/*` (`entries-view`, `entry-date-filter`, `entry-bulk-bar`, `entry-panel`, `entry-detail`, `entry-sheet`, `entry-page`), `lib/entries/*` (`entries.ts`, `queries.ts`, `dates.ts`), `lib/config.ts`, `hooks/use-entry-actions.ts`, `hooks/use-now.ts`
 
 ## 1. Summary
 
@@ -66,6 +66,7 @@ Entries are submissions to a form. The **Entries** tab is an inbox for one form.
   - the spam state, likelihood and reason (FR-9);
   - **previous/next** controls (also `k`/`j`) that move through the current filtered, sorted list, loading the adjacent page when needed.
 - A slide-over opened from a link shows a skeleton while loading. **Lesson from Nuxt:** it was blank until this was added.
+- **As built:** previous/next (and `k`/`j`) are in the slide-over only. On the full page, moving to another entry would be a navigation inside the entries layout, which Next intercepts into a slide-over over the full page, so the full page offers "Back to entries" instead. The date filter applies a range with **Apply** rather than on the second click.
 
 **FR-5 Mark read on open.**
 
@@ -78,7 +79,7 @@ Entries are submissions to a form. The **Entries** tab is an inbox for one form.
 - **Star / Unstar:** `starred`, also inline in the table.
 - **Mark as spam / Not spam:** `spam`.
 - **Delete:** `DELETE /v1/entries/{id}`, with an Undo toast that calls `/restore`.
-- In Trash: **Restore**, and **Delete permanently** (`DELETE /v1/entries/{id}/force`, with confirmation).
+- In Trash: **Restore**, and **Delete permanently** (`DELETE /v1/entries/{id}/force`, with confirmation). The Backend answers 409 for an entry that isn't in Trash.
 - Toggles update optimistically and revert on failure.
 
 **FR-7 Bulk actions.**

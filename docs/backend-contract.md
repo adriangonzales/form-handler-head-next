@@ -19,16 +19,16 @@ Written 2026-10-02 against spec "Headless Form Handler" 0.0.1.
 
 ## Endpoints the dashboard uses
 
-| Area          | Endpoints                                                                                                                                              | Auth                    |
-| ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ | ----------------------- |
-| Auth          | `POST /v1/auth/login`, `POST /v1/auth/refresh`, `POST /v1/auth/logout`, `GET /v1/auth/me`                                                              | mixed                   |
-| Password      | `POST /v1/auth/forgot-password`, `POST /v1/auth/reset-password`                                                                                        | none                    |
-| Account       | `PATCH /v1/auth/me`, `PUT /v1/auth/password`, `DELETE /v1/auth/me?password=`                                                                           | bearer                  |
-| Forms         | `GET`/`POST /v1/forms`, `GET`/`PUT`/`DELETE /v1/forms/{form}`, `POST /v1/forms/{form}/restore`, `POST /v1/forms/{form}/duplicate`                      | bearer                  |
-| Entries       | `GET /v1/forms/{form}/entries`, `POST /v1/forms/{form}/entries/bulk`, `GET`/`PUT`/`DELETE /v1/entries/{entry}`, `POST …/restore`, `DELETE …/force`     | bearer                  |
-| Exports       | `POST /v1/forms/{form}/entries/exports`, `GET /v1/entry-exports`, `GET /v1/entry-exports/{export}`, `GET /v1/entry-exports/{export}/download` (signed) | bearer, except download |
-| Notifications | `GET`/`POST /v1/forms/{form}/notifications`, `GET`/`PUT`/`DELETE /v1/notifications/{notification}`, `POST …/restore`                                   | bearer                  |
-| Submissions   | `POST /v1/forms/{form}/submissions`                                                                                                                    | none                    |
+| Area          | Endpoints                                                                                                                                                 | Auth                    |
+| ------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------- |
+| Auth          | `POST /v1/auth/login`, `POST /v1/auth/refresh`, `POST /v1/auth/logout`, `GET /v1/auth/me`                                                                 | mixed                   |
+| Password      | `POST /v1/auth/forgot-password`, `POST /v1/auth/reset-password`                                                                                           | none                    |
+| Account       | `PATCH /v1/auth/me`, `PUT /v1/auth/password`, `DELETE /v1/auth/me?password=`                                                                              | bearer                  |
+| Forms         | `GET`/`POST /v1/forms`, `GET`/`PUT`/`DELETE /v1/forms/{form}`, `POST /v1/forms/{form}/restore`, `POST /v1/forms/{form}/duplicate`                         | bearer                  |
+| Entries       | `GET`/`POST /v1/forms/{form}/entries`, `POST /v1/forms/{form}/entries/bulk`, `GET`/`PUT`/`DELETE /v1/entries/{entry}`, `POST …/restore`, `DELETE …/force` | bearer                  |
+| Exports       | `POST /v1/forms/{form}/entries/exports`, `GET /v1/entry-exports`, `GET /v1/entry-exports/{export}`, `GET /v1/entry-exports/{export}/download` (signed)    | bearer, except download |
+| Notifications | `GET`/`POST /v1/forms/{form}/notifications`, `GET`/`PUT`/`DELETE /v1/notifications/{notification}`, `POST …/restore`                                      | bearer                  |
+| Submissions   | `POST /v1/forms/{form}/submissions`                                                                                                                       | none                    |
 
 Not used by the dashboard, and not part of this contract: `POST /v1/forms/{form}/entries` (creating entries through the authenticated API) and `POST /v1/webhooks/postmark/bounces` (the reference implementation's mail provider webhook).
 
@@ -60,7 +60,7 @@ _Relied on by `lib/backend/errors.ts`, `lib/form-errors.ts`._
 | 401    | `{message}`                               | Missing, invalid or expired token                                                                             |
 | 403    | `{message}`                               | The resource belongs to someone else; inactive form or domain not allowed on submission; bad export signature |
 | 404    | `{message}`                               | Not found, including soft-deleted resources fetched one at a time                                             |
-| 409    | `{message}`                               | Export download not ready                                                                                     |
+| 409    | `{message}`                               | Export download not ready; permanently deleting an entry that isn't in Trash                                  |
 | 410    | `{message}`                               | Export expired                                                                                                |
 | 422    | `{message, errors: { "path": string[] }}` | Validation. Paths use dot notation: `settings.honeypot_name`, `schema.2.name`, `ids.3`                        |
 | 429    | `{message}` + `Retry-After` (seconds)     | Throttled                                                                                                     |
@@ -139,8 +139,9 @@ _Relied on by `lib/entries/`._
 - `spam_checked_at` is `null` while a public submission awaits its spam check, or if the check couldn't run; otherwise when it finished. Honeypot hits and entries created through the authenticated API are marked checked on arrival, with a score of 0.
 - `user_agent_display` is `{platform, browser, browser_version}` or `null` (it may be filled in asynchronously after arrival). `ip_location_display` may always be `null`.
 - **Update** `PUT /v1/entries/{entry}` changes only `read_at`, `starred`, `spam`, `spam_score`, `spam_reason`, and every field is optional, so one field can be sent alone. Submission fields are read-only: sending any of them → 422. Use `PUT`, the documented method; the reference implementation also accepts `PATCH`, but that isn't part of the contract.
-- **Delete** is soft. `GET /v1/entries/{entry}` returns 404 for a deleted entry. `restore` and `force` apply to deleted entries only.
-- **Bulk** `POST /v1/forms/{form}/entries/bulk` `{action, ids}` with up to 100 IDs. `action` is one of `mark_read`, `mark_unread`, `star`, `unstar`, `mark_spam`, `mark_not_spam`, `delete` (live entries only) or `restore`, `force_delete` (deleted entries only). An ID in the wrong state → 422 on `ids.N`. Returns `{affected}`, counting only entries that changed.
+- **Delete** is soft. `GET /v1/entries/{entry}` returns 404 for a deleted entry. `restore` and `force` apply to deleted entries only; `force` on a live entry → 409.
+- **Create as the owner:** `POST /v1/forms/{form}/entries` takes the input fields at the top level, validated like a public submission, on an active form (inactive → 403). It's checked on arrival with a score of 0.
+- **Bulk** `POST /v1/forms/{form}/entries/bulk` `{action, ids}` with up to 100 IDs. `action` is one of `mark_read`, `mark_unread`, `star`, `unstar`, `mark_spam`, `mark_not_spam`, `delete` (live entries only) or `restore`, `force_delete` (deleted entries only). An ID in the wrong state → 422 on `ids.N`. Returns `{ data: { action, affected } }`, counting only entries that changed.
 
 ## Exports
 
