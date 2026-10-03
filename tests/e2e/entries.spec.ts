@@ -335,6 +335,33 @@ test('a direct link opens the entry as a full page; from the list it opens over 
   await expect(page).toHaveURL(`/forms/${form.id}/entries?sort=created_at`)
 })
 
+test('closing an entry opened from the list keeps the list scrolled where it was', async ({
+  page,
+}) => {
+  await signIn(page)
+  const form = await createForm(page, 'Scroll')
+
+  for (let i = 1; i <= 40; i++) {
+    await addEntry(page, form.id, { name: 'Sam', message: `Scroll ${String(i).padStart(2, '0')}` })
+  }
+
+  const listUrl = `/forms/${form.id}/entries?sort=created_at&per_page=50`
+  await goto(page, listUrl)
+  const target = row(page, 'Scroll 35').getByText('Scroll 35')
+  await target.scrollIntoViewIfNeeded()
+  const scrolled = await page.evaluate(() => window.scrollY)
+  expect(scrolled).toBeGreaterThan(200)
+
+  await target.click()
+  await expect(slideover(page).getByText('Scroll 35')).toBeVisible()
+  await page.keyboard.press('Escape')
+  await expect(slideover(page)).toHaveCount(0)
+
+  await expect(page).toHaveURL(listUrl)
+  await expect(row(page, 'Scroll 35')).toBeInViewport()
+  expect(Math.abs((await page.evaluate(() => window.scrollY)) - scrolled)).toBeLessThanOrEqual(2)
+})
+
 test("an invalid date range shows The Backend's message on the date filter", async ({ page }) => {
   await signIn(page)
   const form = await createForm(page, 'Dates')

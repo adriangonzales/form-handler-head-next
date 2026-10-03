@@ -145,6 +145,56 @@ test('Download fetches the export again for a fresh link', async ({ page }) => {
   await downloading
 })
 
+test('Download still works more than 5 minutes after the export completed', async ({ page }) => {
+  await page.clock.install()
+  await signIn(page)
+  const form = await createForm(page, 'Later')
+  await addEntry(page, form.id, { name: 'Cy', message: 'Still here' })
+  const entryExport = await startExport(page, form.id)
+
+  // Signed links last 5 minutes. Rather than wait, every answer the page caches carries this
+  // export's link already expired (The Backend refuses it), and the page's clock jumps past the
+  // 5 minutes. Only the fetch that Download makes gets the real link.
+  let staleUrl: string | undefined
+  let serveStale = true
+  const makeStale = (row: { id: string; download_url: string | null }) => {
+    if (row.id === entryExport.id && row.download_url) {
+      const url = new URL(row.download_url)
+      url.searchParams.set('expires', String(Math.floor(Date.now() / 1000) - 60))
+      row.download_url = staleUrl = url.toString()
+    }
+  }
+  await page.route(
+    (url) => /\/api\/backend\/entry-exports(\?|\/)/.test(url.pathname + url.search),
+    async (route) => {
+      const response = await route.fetch()
+      if (!serveStale || !response.ok()) return route.fulfill({ response })
+
+      const body = await response.json()
+      for (const row of Array.isArray(body.data) ? body.data : [body.data]) makeStale(row)
+      await route.fulfill({ response, json: body })
+    },
+  )
+
+  await goto(page, `/forms/${form.id}/entries`)
+  await page.getByRole('button', { name: /^Exports/ }).click()
+  const popover = exportsPopover(page)
+  await expect(popover.getByText('1 entry')).toBeVisible({ timeout: 20_000 })
+  await expect.poll(() => staleUrl).toBeDefined()
+  await page.clock.fastForward('06:00')
+
+  serveStale = false
+  const downloading = page.waitForEvent('download')
+  await popover.getByRole('button', { name: /^Download / }).click()
+  const download = await downloading
+
+  expect(download.url()).not.toBe(staleUrl)
+  expect(await download.failure()).toBeNull()
+  const lines = (await readFile((await download.path())!, 'utf8')).trim().split(/\r?\n/)
+  expect(lines).toHaveLength(2)
+  expect(cells(lines[1]!)[3]).toBe('Still here')
+})
+
 test('an export started elsewhere is listed with its live status after a reload', async ({
   page,
 }) => {

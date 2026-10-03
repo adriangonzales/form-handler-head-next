@@ -119,7 +119,8 @@ Exports are processed by The Backend's background workers. The e2e export tests 
 
 - **The export index can't be filtered by form, and exports don't include the form's name.** Not planned (decided 2026-10-02); FR-6 and FR-7 work around both.
 - **A 403 or 410 from the download link can't be detected** (FR-4).
+- **Exports can't be deleted before they expire.** Not planned (decided 2026-10-03); they expire after 24 hours.
 
 ## 9. Open questions
 
-1. Should users be able to delete an export before it expires? The contract has no delete endpoint.
+None. Deleting an export early was decided against on 2026-10-03 (§8).
