@@ -158,12 +158,15 @@ _Relied on by `lib/exports/`, `hooks/use-exports-watcher.ts`, `hooks/use-export-
 
 ## Notifications
 
-_Relied on by `lib/notifications/`._
+_Relied on by `lib/notifications/`, `lib/backend/notifications.ts`._
 
-- Recipients `{type: "email" | "sms", value, enabled, error}` belong to a form. `value` is an email address for `email`, and E.164 (`+14155552671`) for `sms`.
-- `PUT /v1/notifications/{notification}` requires `type`, `value` and `enabled`.
-- `error` is read-only: set when delivery fails (for example a bounce or spam complaint, where the backend can detect them), cleared by the next successful delivery.
-- Delete is soft; `restore` brings the recipient back.
+- Recipients `{type: "email" | "sms", value, enabled, error}` belong to a form. `value` is an email address (at most 255 characters) for `email`, and E.164 (`+14155552671`: `+`, a country code not starting with 0, at most 15 digits, no spaces) for `sms`. A value that doesn't match its type → 422 on `value`.
+- **Create** `POST /v1/forms/{form}/notifications` `{type, value, enabled?}` → 2xx; `enabled` defaults to `true`.
+- **Update** `PUT /v1/notifications/{notification}` requires `type`, `value` and `enabled`. Sending `form_id`, even as `null`, → 422 on `form_id`: a recipient never moves to another form.
+- `error` is read-only: set when delivery fails (for example a bounce or spam complaint, where the backend can detect them), cleared by the next successful delivery. Sending it on create or update, even as `null`, → 422 on `error`.
+- The list is fixed at 15 per page (it ignores `per_page`), and its order isn't specified.
+- Delete is soft: the recipient leaves the list and answers 404; `restore` brings it back.
+- Another user's recipient → 403. So is a recipient of a deleted form, whose list answers 404 like the form.
 - SMS recipients are stored but not alerted in the reference implementation.
 
 ## Deployment requirements

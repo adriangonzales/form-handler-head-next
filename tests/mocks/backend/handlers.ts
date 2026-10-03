@@ -29,8 +29,9 @@ import {
   validateExportParameters,
   validSignature,
 } from './exports'
+import { newNotification, validateNotification } from './notifications'
 import { MockBackendState } from './state'
-import type { FormEntry } from '../../../types/models'
+import type { FormEntry, FormNotification } from '../../../types/models'
 
 // A mock of The Backend that follows docs/backend-contract.md, for `pnpm dev:mock` and for running
 // the contract suite without the reference Backend. Endpoints are added as features need them.
@@ -194,6 +195,36 @@ export function createMockBackend(options: {
     return handle(entry)
   }
 
+  /**
+   * Runs `handle` for a recipient on one of the signed-in user's forms: 401 for guests, 404 for
+   * unknown (or, unless `withTrashed`, deleted) recipients, and 403 for someone else's or those
+   * of a deleted form.
+   */
+  function withNotification(
+    request: Request,
+    id: unknown,
+    handle: (notification: FormNotification) => Response | Promise<Response>,
+    options: { withTrashed?: boolean } = {},
+  ) {
+    const user = state.authenticate(bearer(request))
+
+    if (!user) return unauthenticated()
+
+    const notification = state.notifications.get(String(id).toLowerCase())
+
+    if (!notification || (notification.deleted_at !== null && !options.withTrashed)) {
+      return notFound()
+    }
+
+    const form = state.forms.get(notification.form_id)
+
+    if (!form || form.user_id !== user.id || form.deleted_at !== null) {
+      return HttpResponse.json({ message: 'You do not own this form.' }, { status: 403 })
+    }
+
+    return handle(notification)
+  }
+
   const at = (ms?: number) => state.timestamp(ms)
 
   /** Brings an export up to date with the time, and returns it as the resource. */
@@ -261,6 +292,29 @@ export function createMockBackend(options: {
         return HttpResponse.json({ message: (error as Error).message }, { status: 409 })
       }
     }),
+
+    // Mock-only: records a bounce, standing in for a mail provider's webhook, so delivery problems
+    // can be seen in `pnpm dev:mock`.
+    http.post(
+      `${origin}/__mock/notifications/:notification/bounce`,
+      async ({ request, params }) => {
+        const notification = state.notifications.get(String(params.notification).toLowerCase())
+
+        if (!notification) return notFound()
+
+        const body = await jsonBody(request)
+
+        notification.error =
+          typeof body.message === 'string'
+            ? body.message.slice(0, 255)
+            : 'Bounced (HardBounce): The server was unable to deliver your message.'
+
+        return HttpResponse.json({ data: notification })
+      },
+    ),
+
+    // Mock-only: the alerts sent so far, standing in for a mail catcher.
+    http.get(`${origin}/__mock/alerts`, () => HttpResponse.json({ data: state.alerts })),
 
     http.get(`${origin}/docs/api.json`, () =>
       options.spec ? HttpResponse.json(options.spec) : new HttpResponse(null, { status: 404 }),
@@ -501,6 +555,7 @@ export function createMockBackend(options: {
       })
 
       state.entries.set(entry.id, entry)
+      state.sendAlerts(entry)
 
       return respond(
         {
@@ -729,6 +784,77 @@ export function createMockBackend(options: {
     http.get(`${api}/entry-exports/:export`, ({ request, params }) =>
       withExport(request, params.export, (entryExport) =>
         HttpResponse.json({ data: exportOut(entryExport) }),
+      ),
+    ),
+
+    // Notifications: a form's alert recipients. The list is fixed at 15 per page.
+    http.get(`${api}/forms/:form/notifications`, ({ request, params }) =>
+      withForm(request, params.form, (form) =>
+        HttpResponse.json(paginate(request, state.notificationsOf(form.id), 15)),
+      ),
+    ),
+
+    http.post(`${api}/forms/:form/notifications`, ({ request, params }) =>
+      withForm(request, params.form, async (form) => {
+        const body = await jsonBody(request)
+        const errors = validateNotification(body, 'create')
+
+        if (Object.keys(errors).length > 0) return invalid(errors)
+
+        const notification = newNotification(
+          form.id,
+          body as { type: string; value: string; enabled?: unknown },
+          state.timestamp(),
+        )
+
+        state.notifications.set(notification.id, notification)
+
+        return HttpResponse.json({ data: notification }, { status: 201 })
+      }),
+    ),
+
+    http.get(`${api}/notifications/:notification`, ({ request, params }) =>
+      withNotification(request, params.notification, (notification) =>
+        HttpResponse.json({ data: notification }),
+      ),
+    ),
+
+    http.put(`${api}/notifications/:notification`, ({ request, params }) =>
+      withNotification(request, params.notification, async (notification) => {
+        const body = await jsonBody(request)
+        const errors = validateNotification(body, 'update')
+
+        if (Object.keys(errors).length > 0) return invalid(errors)
+
+        Object.assign(notification, {
+          type: body.type,
+          value: body.value,
+          enabled: body.enabled,
+          updated_at: state.timestamp(),
+        })
+
+        return HttpResponse.json({ data: notification })
+      }),
+    ),
+
+    http.delete(`${api}/notifications/:notification`, ({ request, params }) =>
+      withNotification(request, params.notification, (notification) => {
+        notification.deleted_at = state.timestamp()
+
+        return new HttpResponse(null, { status: 204 })
+      }),
+    ),
+
+    http.post(`${api}/notifications/:notification/restore`, ({ request, params }) =>
+      withNotification(
+        request,
+        params.notification,
+        (notification) => {
+          notification.deleted_at = null
+
+          return HttpResponse.json({ data: notification })
+        },
+        { withTrashed: true },
       ),
     ),
 

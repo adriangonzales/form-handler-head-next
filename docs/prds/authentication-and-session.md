@@ -51,7 +51,8 @@ Next.js-specific constraint: **Server Components can't set cookies.** A refresh 
 - **Before rendering (`proxy.ts`):** on every dashboard navigation, if `expiresAt` is less than `AUTH_REFRESH_AHEAD_SECONDS` (default 120) away, it refreshes and writes the new cookie on the request and the response, so Server Components rendering that request read the fresh token.
 - **In the proxy route (`/api/backend/**`):** the same check before forwarding. After a 401 from The Backend, it refreshes once and retries the original request once. If the refresh or the retry fails, it destroys the session and returns 401.
 - **In the auth route handlers** that call The Backend with the token (`me`, `password`, account deletion): the same refresh-and-retry-once rule, through one shared `withBackendToken` helper.
-- Server Components never refresh. If a token turns out to be invalid during a render anyway, the render redirects to `/login?next=…`.
+- Server Components never refresh. If a token turns out to be invalid during a render anyway, the render first checks whether another request already refreshed it (a browser request still carrying the same cookie, between `proxy.ts` and the render), and retries once with the token that refresh produced, read from the refresh coordinator. Otherwise it redirects to `/login?reason=expired`.
+  - **As built (milestone 7):** the retry was added when the Notifications e2e tests reloaded the page while an Enabled-switch update was still in flight. With every request refreshing (as in e2e), the list refetch refreshed the token the render had just been given, and the render's call got a 401. It failed 4 runs out of 4 without the retry. In production it needs a refresh between `proxy.ts` and the render, so it's rare, but it would sign the user out.
 
 Refreshing invalidates the old token, so refreshes must never overlap — across requests, browser tabs, and server instances:
 

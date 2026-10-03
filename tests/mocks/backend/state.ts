@@ -1,5 +1,5 @@
 import { randomBytes } from 'node:crypto'
-import type { FormEntry, User } from '../../../types/models'
+import type { FormEntry, FormNotification, User } from '../../../types/models'
 import { type MockExport, signingSecret } from './exports'
 import type { MockForm } from './forms'
 
@@ -33,6 +33,10 @@ export class MockBackendState {
   readonly entries = new Map<string, FormEntry>()
   /** Every export, by ID. */
   readonly exports = new Map<string, MockExport>()
+  /** Every alert recipient, including soft-deleted ones, by ID. */
+  readonly notifications = new Map<string, FormNotification>()
+  /** Alerts "sent" so far, oldest first. The mock delivers them on the spot, and never fails. */
+  readonly alerts: { notificationId: string; entryId: string; to: string; at: string }[] = []
   /** Signs export download links. */
   readonly signingSecret = signingSecret()
 
@@ -77,6 +81,10 @@ export class MockBackendState {
 
       for (const [exportId, entryExport] of this.exports) {
         if (entryExport.form_id === formId) this.exports.delete(exportId)
+      }
+
+      for (const [notificationId, notification] of this.notifications) {
+        if (notification.form_id === formId) this.notifications.delete(notificationId)
       }
     }
 
@@ -134,6 +142,33 @@ export class MockBackendState {
 
   entriesOf(formId: string): FormEntry[] {
     return [...this.entries.values()].filter((entry) => entry.form_id === formId)
+  }
+
+  /** A form's recipients, in the order they were added (the contract doesn't fix an order). */
+  notificationsOf(formId: string): FormNotification[] {
+    return [...this.notifications.values()].filter(
+      (notification) => notification.form_id === formId && notification.deleted_at === null,
+    )
+  }
+
+  /**
+   * Alerts a new public entry's enabled email recipients, unless it's spam. A delivery clears the
+   * recipient's error, as the contract says. SMS isn't delivered, as in the reference Backend.
+   */
+  sendAlerts(entry: FormEntry) {
+    if (entry.spam === true) return
+
+    for (const notification of this.notificationsOf(entry.form_id)) {
+      if (!notification.enabled || notification.type !== 'email') continue
+
+      this.alerts.push({
+        notificationId: notification.id,
+        entryId: entry.id,
+        to: notification.value,
+        at: this.timestamp(),
+      })
+      notification.error = null
+    }
   }
 
   /** The current time, or `ms`, as the contract's ISO 8601 UTC string. */

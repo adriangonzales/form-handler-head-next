@@ -89,7 +89,7 @@ The behaviour is the same. These are the mechanisms that differ, and why.
 | Schema builder, embed snippets, test submit                                                   | Built (milestone 4, 2026-10-02)                                                       |
 | Entry inbox and triage                                                                        | Built (milestone 5, 2026-10-02)                                                       |
 | CSV export                                                                                    | Built (milestone 6, 2026-10-02)                                                       |
-| Notification recipients                                                                       | Planned (milestone 7)                                                                 |
+| Notification recipients                                                                       | Built (milestone 7, 2026-10-03)                                                       |
 | Account self-service                                                                          | Planned (milestone 8)                                                                 |
 | Accessibility (WCAG 2.1 AA scan), end-to-end happy path, README                               | Planned (milestone 9)                                                                 |
 | Full suite against the mock backend                                                           | Planned (milestone 10)                                                                |

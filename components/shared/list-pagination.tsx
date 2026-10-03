@@ -12,7 +12,10 @@ import {
 import { pageSizes } from '@/lib/list-query'
 import type { Paginated } from '@/types/models'
 
-/** Rows-per-page choice, the range shown, and previous/next page buttons. */
+/**
+ * Rows-per-page choice, the range shown, and previous/next page buttons. Lists with a fixed page
+ * size leave out `onPerPageChange`, and get no rows-per-page choice.
+ */
 export function ListPagination({
   meta,
   perPage,
@@ -20,9 +23,9 @@ export function ListPagination({
   onPerPageChange,
 }: {
   meta: Paginated<unknown>['meta']
-  perPage: number
+  perPage?: number
   onPageChange: (page: number) => void
-  onPerPageChange: (perPage: number) => void
+  onPerPageChange?: (perPage: number) => void
 }) {
   const { current_page: page, last_page: lastPage, from, to, total } = meta
 
@@ -32,19 +35,26 @@ export function ListPagination({
       className="flex flex-wrap items-center justify-between gap-3 text-sm text-muted-foreground"
     >
       <div className="flex items-center gap-2">
-        <span id="rows-per-page">Rows per page</span>
-        <Select value={String(perPage)} onValueChange={(value) => onPerPageChange(Number(value))}>
-          <SelectTrigger size="sm" aria-labelledby="rows-per-page" className="w-20">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {pageSizes.map((size) => (
-              <SelectItem key={size} value={String(size)}>
-                {size}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        {onPerPageChange && (
+          <>
+            <span id="rows-per-page">Rows per page</span>
+            <Select
+              value={String(perPage)}
+              onValueChange={(value) => onPerPageChange(Number(value))}
+            >
+              <SelectTrigger size="sm" aria-labelledby="rows-per-page" className="w-20">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {pageSizes.map((size) => (
+                  <SelectItem key={size} value={String(size)}>
+                    {size}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </>
+        )}
         <span className="tabular-nums">
           {from ?? 0}–{to ?? 0} of {total}
         </span>

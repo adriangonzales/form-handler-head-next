@@ -72,6 +72,26 @@ export class RefreshCoordinator {
     return (await this.storeCall(() => this.store.get(resultKey(token)))) !== null
   }
 
+  /**
+   * The newest token that `token` was refreshed to by other requests, following up to `maxHops`
+   * refreshes in a row; `null` when it wasn't refreshed (or the refresh was refused). Never
+   * refreshes, so callers that can't save a cookie (Server Components) can use it.
+   */
+  async refreshedTo(token: string, maxHops = 3): Promise<TokenSet | null> {
+    let latest: TokenSet | null = null
+
+    for (let hop = 0; hop < maxHops; hop++) {
+      const stored = await this.storeCall(() => this.store.get(resultKey(latest?.token ?? token)))
+      const next = stored === null ? null : await this.codec.unseal(stored)
+
+      if (!next) break
+
+      latest = next
+    }
+
+    return latest
+  }
+
   async refresh(token: string, refreshAtBackend: RefreshAtBackend): Promise<TokenSet | null> {
     const deadline = this.now() + this.lockTtlMs * 2
 

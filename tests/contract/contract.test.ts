@@ -797,3 +797,182 @@ describe.skipIf(!canCreateUsers)('exports', () => {
     expect(index.body.data.map((row: { id: string }) => row.id)).not.toContain(gone)
   })
 })
+
+describe.skipIf(!canCreateUsers)('notifications', () => {
+  let account: Account
+  let other: Account
+  let token: string
+  let otherToken: string
+  let formId: string
+
+  const signIn = async (user: Account) =>
+    (
+      await call('/v1/auth/login', {
+        method: 'POST',
+        body: JSON.stringify({ email: user.email, password: user.password }),
+      })
+    ).body.access_token as string
+
+  const createForm = async (name: string, as = token) =>
+    (await call('/v1/forms', { method: 'POST', token: as, body: JSON.stringify({ name }) })).body
+      .data.id as string
+
+  const addRecipient = (body: Record<string, unknown>, form = formId, as = token) =>
+    call(`/v1/forms/${form}/notifications`, {
+      method: 'POST',
+      token: as,
+      body: JSON.stringify(body),
+    })
+
+  const update = (id: string, body: Record<string, unknown>) =>
+    call(`/v1/notifications/${id}`, { method: 'PUT', token, body: JSON.stringify(body) })
+
+  const listIds = async (form = formId) =>
+    (await call(`/v1/forms/${form}/notifications`, { token })).body.data.map(
+      (row: { id: string }) => row.id,
+    )
+
+  beforeAll(async () => {
+    account = createThrowawayUser('Contract')
+    other = createThrowawayUser('Contract')
+    token = await signIn(account)
+    otherToken = await signIn(other)
+    formId = await createForm('Contract Notifications')
+  })
+
+  afterAll(async () => {
+    for (const [user, userToken] of [
+      [account, token],
+      [other, otherToken],
+    ] as const) {
+      if (userToken) {
+        await call(`/v1/auth/me?password=${encodeURIComponent(user.password)}`, {
+          method: 'DELETE',
+          token: userToken,
+        })
+      }
+    }
+  })
+
+  it('adds recipients enabled by default, listed at a fixed 15 per page', async () => {
+    const email = await addRecipient({ type: 'email', value: 'alerts@example.com' })
+    const sms = await addRecipient({ type: 'sms', value: '+14155552671', enabled: false })
+
+    expect(email.status).toBeGreaterThanOrEqual(200)
+    expect(email.status).toBeLessThan(300)
+    expect(email.body.data).toMatchObject({
+      form_id: formId,
+      type: 'email',
+      value: 'alerts@example.com',
+      enabled: true,
+      error: null,
+      deleted_at: null,
+    })
+    expect(email.body.data.id).toMatch(/^[0-9a-hjkmnp-tv-z]{26}$/)
+    expect(sms.body.data).toMatchObject({ type: 'sms', enabled: false })
+
+    const list = await call(`/v1/forms/${formId}/notifications?per_page=1`, { token })
+
+    expect(list.status).toBe(200)
+    expect(list.body.meta).toMatchObject({ per_page: 15, total: 2, current_page: 1 })
+    // The contract doesn't fix the list's order.
+    expect(list.body.data.map((row: { id: string }) => row.id).sort()).toEqual(
+      [email.body.data.id, sms.body.data.id].sort(),
+    )
+  })
+
+  it('checks the value against the type, and refuses to take an error', async () => {
+    for (const body of [
+      { type: 'email', value: 'not-an-email' },
+      { type: 'sms', value: '415-555-2671' },
+      { type: 'sms', value: '+1 415 555 2671' },
+      { type: 'sms', value: '+0123456' },
+    ]) {
+      const response = await addRecipient(body)
+
+      expect(response.status, JSON.stringify(body)).toBe(422)
+      expect(Object.keys(response.body.errors)).toEqual(['value'])
+    }
+
+    const typeError = await addRecipient({ type: 'pigeon', value: 'coo' })
+
+    expect(typeError.status).toBe(422)
+    expect(Object.keys(typeError.body.errors)).toContain('type')
+
+    const withError = await addRecipient({ type: 'email', value: 'a@example.com', error: null })
+
+    expect(withError.status).toBe(422)
+    expect(Object.keys(withError.body.errors)).toEqual(['error'])
+  })
+
+  it('requires type, value and enabled on update, and never moves a recipient', async () => {
+    const id = (await addRecipient({ type: 'email', value: 'edit@example.com' })).body.data.id
+
+    const missing = await update(id, { enabled: false })
+
+    expect(missing.status).toBe(422)
+    expect(Object.keys(missing.body.errors).sort()).toEqual(['type', 'value'])
+
+    const noEnabled = await update(id, { type: 'email', value: 'edit@example.com' })
+
+    expect(noEnabled.status).toBe(422)
+    expect(Object.keys(noEnabled.body.errors)).toEqual(['enabled'])
+
+    const moved = await update(id, {
+      type: 'email',
+      value: 'edit@example.com',
+      enabled: true,
+      form_id: madeUpUlid,
+    })
+
+    expect(moved.status).toBe(422)
+    expect(Object.keys(moved.body.errors)).toEqual(['form_id'])
+
+    const changed = await update(id, { type: 'sms', value: '+447700900123', enabled: false })
+
+    expect(changed.status).toBe(200)
+    expect(changed.body.data).toMatchObject({
+      id,
+      form_id: formId,
+      type: 'sms',
+      value: '+447700900123',
+      enabled: false,
+    })
+    expect((await call(`/v1/notifications/${id}`, { token })).body.data.enabled).toBe(false)
+  })
+
+  it('soft-deletes a recipient, answering 404 until it is restored', async () => {
+    const id = (await addRecipient({ type: 'email', value: 'gone@example.com' })).body.data.id
+
+    expect((await call(`/v1/notifications/${id}`, { method: 'DELETE', token })).status).toBe(204)
+    expect((await call(`/v1/notifications/${id}`, { token })).status).toBe(404)
+    expect(await listIds()).not.toContain(id)
+
+    const restored = await call(`/v1/notifications/${id}/restore`, { method: 'POST', token })
+
+    expect(restored.status).toBe(200)
+    expect(restored.body.data).toMatchObject({ id, deleted_at: null })
+    expect(await listIds()).toContain(id)
+  })
+
+  it("answers 403 for someone else's recipients, and those of a deleted form", async () => {
+    const theirForm = await createForm('Not yours', otherToken)
+    const theirs = (
+      await addRecipient({ type: 'email', value: 'theirs@example.com' }, theirForm, otherToken)
+    ).body.data.id
+
+    expect((await call(`/v1/notifications/${theirs}`, { token })).status).toBe(403)
+    expect((await call(`/v1/forms/${theirForm}/notifications`, { token })).status).toBe(403)
+    expect((await addRecipient({ type: 'email', value: 'me@example.com' }, theirForm)).status).toBe(
+      403,
+    )
+
+    const doomed = await createForm('Deleted with recipients')
+    const orphan = (await addRecipient({ type: 'email', value: 'o@example.com' }, doomed)).body.data
+      .id
+
+    await call(`/v1/forms/${doomed}`, { method: 'DELETE', token })
+    expect((await call(`/v1/notifications/${orphan}`, { token })).status).toBe(403)
+    expect((await call(`/v1/forms/${doomed}/notifications`, { token })).status).toBe(404)
+  })
+})

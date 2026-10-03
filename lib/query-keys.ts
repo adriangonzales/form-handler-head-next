@@ -31,4 +31,11 @@ export const queryKeys = {
     lists: () => [...queryKeys.exports.all, 'list'] as const,
     list: (query: ApiQuery) => [...queryKeys.exports.lists(), query] as const,
   },
+  notifications: {
+    all: ['notifications'] as const,
+    /** Every page of one form's recipients. */
+    lists: (formId: string) => [...queryKeys.notifications.all, 'form', formId] as const,
+    list: (formId: string, page: number) =>
+      [...queryKeys.notifications.lists(formId), page] as const,
+  },
 }

@@ -77,6 +77,24 @@ describe('RefreshCoordinator', () => {
     expect(refreshAtBackend).toHaveBeenCalledTimes(1)
   })
 
+  it('tells a render which token other requests refreshed its token to, without refreshing', async () => {
+    const coordinator = coordinatorOn(new MemoryRefreshStore())
+    const second: TokenSet = { token: 'newer-token', expiresAt: 2_000_000 }
+
+    expect(await coordinator.refreshedTo('old-token')).toBeNull()
+
+    await coordinator.refresh('old-token', async () => fresh)
+    expect(await coordinator.refreshedTo('old-token')).toEqual(fresh)
+
+    // The browser moved on again with the new token: follow the chain to the newest one.
+    await coordinator.refresh('new-token', async () => second)
+    expect(await coordinator.refreshedTo('old-token')).toEqual(second)
+
+    // A refused refresh ends the chain where it was.
+    await coordinator.refresh('newer-token', async () => null)
+    expect(await coordinator.refreshedTo('old-token')).toEqual(second)
+  })
+
   it('forgets a refresh after a minute', async () => {
     let now = 0
     const coordinator = coordinatorOn(new MemoryRefreshStore(() => now), () => now)
