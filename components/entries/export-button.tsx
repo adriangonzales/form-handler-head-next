@@ -13,6 +13,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Skeleton } from '@/components/ui/skeleton'
 import { useExportActions } from '@/hooks/use-export-actions'
 import { onExportSettled } from '@/hooks/use-exports-watcher'
+import { useHydrated } from '@/hooks/use-hydrated'
 import type { ApiQuery } from '@/lib/backend/query'
 import { entriesLabel } from '@/lib/entries/entries'
 import {
@@ -45,7 +46,10 @@ export function ExportButton({
   const recent = useQuery(exportsListQuery(recentExportsQuery))
   const all = recent.data?.data ?? noExports
   const formExports = useMemo(() => all.filter((row) => row.form_id === formId), [all, formId])
-  const inProgress = formExports.filter(isInProgress).length
+  // The server renders no count. Under the Entries skeleton this hydrates after the dashboard's
+  // exports watcher has loaded the recent exports, so counting before then wouldn't match it.
+  const hydrated = useHydrated()
+  const inProgress = hydrated ? formExports.filter(isInProgress).length : 0
   const hasMore = (recent.data?.meta.last_page ?? 1) > 1
   const { busy, download, retry, start } = useExportActions()
 
@@ -163,7 +167,7 @@ export function ExportButton({
           {hasMore && (
             <p className="text-xs text-muted-foreground">
               Only your 100 most recent exports are checked here.{' '}
-              <Link href="/exports" className="text-primary hover:underline">
+              <Link href="/exports" className="text-primary underline underline-offset-3">
                 See all exports
               </Link>
               .

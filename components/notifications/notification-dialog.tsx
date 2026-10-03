@@ -62,7 +62,19 @@ export function NotificationDialog({
 }) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent
+        className="sm:max-w-md"
+        // Starts on the address. Not `autoFocus`, which would focus it before Radix notes what had
+        // focus, so focus couldn't return to the button that opened the dialog.
+        onOpenAutoFocus={(event) => {
+          const value = document.getElementById('notification-value')
+
+          if (value) {
+            event.preventDefault()
+            value.focus()
+          }
+        }}
+      >
         <DialogHeader>
           <DialogTitle>{notification ? 'Edit recipient' : 'Add recipient'}</DialogTitle>
           <DialogDescription>
@@ -181,7 +193,6 @@ function NotificationFields({
               placeholder={isSms ? '+14155552671' : 'name@example.com'}
               aria-invalid={!!errors.value}
               aria-describedby={isSms ? 'notification-value-help' : undefined}
-              autoFocus
               {...valueField}
             />
             {isSms && (

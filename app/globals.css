@@ -68,7 +68,9 @@
   --muted-foreground: oklch(0.442 0.017 285.786);
   --accent: oklch(0.967 0.001 286.375);
   --accent-foreground: oklch(0.21 0.006 285.885);
-  --destructive: oklch(0.577 0.245 27.325);
+  /* Darker than shadcn's red-600: destructive buttons put this on a 10% tint of itself, and
+     red-600 only reaches 4:1 there (WCAG AA needs 4.5:1). */
+  --destructive: oklch(0.505 0.213 27.518);
   --border: oklch(0.92 0.004 286.32);
   --input: oklch(0.92 0.004 286.32);
   --ring: oklch(0.585 0.233 277.117);

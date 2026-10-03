@@ -93,7 +93,7 @@ export function IntegratePanel({ formId }: { formId: string }) {
           </h2>
           <p className="text-sm text-muted-foreground">
             Generated from this form&apos;s{' '}
-            <Link href={fieldsHref} className="text-primary hover:underline">
+            <Link href={fieldsHref} className="text-primary underline underline-offset-3">
               fields
             </Link>
             {honeypotName && ' and its honeypot'}.

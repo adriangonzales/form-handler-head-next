@@ -113,10 +113,19 @@ export function NewForm() {
                     <FieldLabel key={template.id} htmlFor={`template-${template.id}`}>
                       <Field orientation="horizontal">
                         <FieldContent>
-                          <FieldTitle>{template.label}</FieldTitle>
-                          <FieldDescription>{template.description}</FieldDescription>
+                          <FieldTitle id={`template-${template.id}-label`}>
+                            {template.label}
+                          </FieldTitle>
+                          <FieldDescription id={`template-${template.id}-description`}>
+                            {template.description}
+                          </FieldDescription>
                         </FieldContent>
-                        <RadioGroupItem value={template.id} id={`template-${template.id}`} />
+                        <RadioGroupItem
+                          value={template.id}
+                          id={`template-${template.id}`}
+                          aria-labelledby={`template-${template.id}-label`}
+                          aria-describedby={`template-${template.id}-description`}
+                        />
                       </Field>
                     </FieldLabel>
                   ))}

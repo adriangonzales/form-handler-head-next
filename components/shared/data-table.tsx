@@ -35,6 +35,23 @@ export function dataTableColumns<T extends RowData>() {
 
 const noSelection: RowSelectionState = {}
 
+/**
+ * Renders a column's header or cell. TanStack's `FlexRender` passes a function to
+ * `createElement`, so columns built during a render (as the Entries and Exports tables build
+ * theirs) would give every cell a new component type, remounting it and dropping keyboard focus.
+ * Calling the function here keeps the element type stable.
+ */
+function Template<TProps extends object>({
+  template,
+  props,
+}: {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  template: string | ((props: TProps) => any) | undefined
+  props: TProps
+}): React.ReactNode {
+  return typeof template === 'function' ? template(props) : template
+}
+
 /** Elements inside a row that handle their own clicks, so the row's click doesn't also fire. */
 const interactive =
   'a, button, input, select, textarea, label, [role="checkbox"], [role="menuitem"]'
@@ -96,7 +113,12 @@ export function DataTable<T extends RowData>({
             <TableRow key={group.id}>
               {group.headers.map((header) => (
                 <TableHead key={header.id}>
-                  {header.isPlaceholder ? null : <table.FlexRender header={header} />}
+                  {header.isPlaceholder ? null : (
+                    <Template
+                      template={header.column.columnDef.header}
+                      props={header.getContext()}
+                    />
+                  )}
                 </TableHead>
               ))}
             </TableRow>
@@ -127,7 +149,7 @@ export function DataTable<T extends RowData>({
               >
                 {row.getAllCells().map((cell) => (
                   <TableCell key={cell.id}>
-                    <table.FlexRender cell={cell} />
+                    <Template template={cell.column.columnDef.cell} props={cell.getContext()} />
                   </TableCell>
                 ))}
               </TableRow>

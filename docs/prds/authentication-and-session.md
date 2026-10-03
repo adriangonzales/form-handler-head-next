@@ -36,6 +36,7 @@ Account holders sign in with email and password. The Next.js server exchanges th
 **FR-3 Log out.**
 
 - **Log out** calls `POST /api/auth/logout`. That calls The Backend's `POST /v1/auth/logout` to invalidate the token, then destroys the session, whatever The Backend returned.
+- If another request has already refreshed the session's token, The Backend no longer accepts it, but the token that refresh produced is live and may already be in the browser's cookie. Logout revokes that newest token instead (following the refresh coordinator's chain). **Fixed 2026-10-03:** logout used to skip revoking in this case, leaving the newer token valid until it expired.
 - The user lands on `/login`. Other open tabs find out on their next request (401 → login).
 
 **FR-4 Route protection.**

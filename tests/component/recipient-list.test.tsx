@@ -198,10 +198,15 @@ describe('RecipientList', () => {
         return HttpResponse.json({ message: 'Server error.' }, { status: 500 })
       }),
     )
-    await waitFor(() => expect(toggle).toBeEnabled())
+    await waitFor(() => expect(toggle).not.toHaveAttribute('aria-disabled', 'true'))
     await user.click(toggle)
     await waitFor(() => expect(toggle).toBeChecked())
-    expect(toggle).toBeDisabled()
+
+    // While saving, another press is ignored, and the switch keeps focus (`disabled` would drop it).
+    expect(toggle).toHaveAttribute('aria-disabled', 'true')
+    await user.keyboard(' ')
+    expect(toggle).toBeChecked()
+    expect(toggle).toHaveFocus()
     expect(await screen.findByText('Server error.')).toBeVisible()
     await waitFor(() => expect(toggle).not.toBeChecked())
   })

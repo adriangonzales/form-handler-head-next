@@ -120,8 +120,14 @@ test('logging out ends the session', async ({ page }) => {
 test('a session whose token was revoked ends with the expiry notice', async ({ page, context }) => {
   await signIn(page)
 
-  // Logging out from a copy of the session invalidates the token chain this browser holds.
+  // Logging out from a copy of the session invalidates the token chain this browser holds, even
+  // if the page's own requests have refreshed the token since the copy was taken.
   const cookies = await context.cookies()
+
+  // Every request refreshes the token in this suite, so this moves the browser past the copy's
+  // token, which the page's own requests could also do at any moment.
+  expect((await page.request.get('/api/backend/forms')).status()).toBe(200)
+
   const other = await context.browser()!.newContext()
 
   await other.addCookies(cookies)

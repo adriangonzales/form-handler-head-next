@@ -49,8 +49,11 @@ export function FormHeader({ formId }: { formId: string }) {
         <Switch
           id="form-active"
           checked={form.active}
-          disabled={setActive.isPending}
-          onCheckedChange={(active) => setActive.mutate({ form, active })}
+          // Not `disabled` while saving, which would drop keyboard focus.
+          aria-disabled={setActive.isPending}
+          onCheckedChange={(active) => {
+            if (!setActive.isPending) setActive.mutate({ form, active })
+          }}
         />
         <Label htmlFor="form-active" className="w-16">
           {form.active ? 'Active' : 'Inactive'}

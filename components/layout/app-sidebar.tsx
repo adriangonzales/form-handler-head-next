@@ -26,6 +26,7 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarRail,
+  useSidebar,
 } from '@/components/ui/sidebar'
 import { isInProgress } from '@/lib/exports/exports'
 import { exportsListQuery, recentExportsQuery } from '@/lib/exports/queries'
@@ -46,6 +47,9 @@ async function logOut() {
 export function AppSidebar({ user }: { user: Pick<SessionUser, 'name' | 'email'> }) {
   const pathname = usePathname()
   const { resolvedTheme, setTheme } = useTheme()
+  // On phones the sidebar is a sheet over the page, so following a link closes it.
+  const { setOpenMobile } = useSidebar()
+  const closeOnPhone = () => setOpenMobile(false)
   const dark = resolvedTheme === 'dark'
   // The dashboard's exports watcher loads and polls these.
   const { data: recentExports } = useQuery(exportsListQuery(recentExportsQuery))
@@ -57,7 +61,7 @@ export function AppSidebar({ user }: { user: Pick<SessionUser, 'name' | 'email'>
         <SidebarMenu>
           <SidebarMenuItem>
             <SidebarMenuButton asChild tooltip="Form Handler">
-              <Link href="/forms" className="font-semibold">
+              <Link href="/forms" className="font-semibold" onClick={closeOnPhone}>
                 <Inbox className="text-primary" aria-hidden />
                 <span>Form Handler</span>
               </Link>
@@ -77,7 +81,11 @@ export function AppSidebar({ user }: { user: Pick<SessionUser, 'name' | 'email'>
                 return (
                   <SidebarMenuItem key={href}>
                     <SidebarMenuButton asChild isActive={active} tooltip={label}>
-                      <Link href={href} aria-current={active ? 'page' : undefined}>
+                      <Link
+                        href={href}
+                        aria-current={active ? 'page' : undefined}
+                        onClick={closeOnPhone}
+                      >
                         <Icon aria-hidden />
                         <span>{label}</span>
                         {badge > 0 && <span className="sr-only">, {badge} in progress</span>}
@@ -119,7 +127,7 @@ export function AppSidebar({ user }: { user: Pick<SessionUser, 'name' | 'email'>
                     {dark ? 'Light mode' : 'Dark mode'}
                   </DropdownMenuItem>
                   <DropdownMenuItem asChild>
-                    <Link href="/account">
+                    <Link href="/account" onClick={closeOnPhone}>
                       <User aria-hidden />
                       Account
                     </Link>

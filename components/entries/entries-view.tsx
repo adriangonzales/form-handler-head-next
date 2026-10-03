@@ -143,6 +143,9 @@ export function EntriesView({ formId, renderedAt }: { formId: string; renderedAt
   const [starring, setStarring] = useState<string>()
 
   async function toggleStar(entry: FormEntry) {
+    // The button is `aria-disabled` while saving rather than `disabled`, which would drop focus.
+    if (starring !== undefined) return
+
     setStarring(entry.id)
     await actions.update(entry, { starred: !entry.starred })
     if (status === 'starred') await actions.refresh()
@@ -199,7 +202,7 @@ export function EntriesView({ formId, renderedAt }: { formId: string; renderedAt
             size="icon-sm"
             aria-label={row.original.starred ? 'Unstar entry' : 'Star entry'}
             aria-pressed={row.original.starred}
-            disabled={starring === row.original.id}
+            aria-disabled={starring === row.original.id}
             onClick={() => void toggleStar(row.original)}
           >
             <Star
@@ -283,9 +286,11 @@ export function EntriesView({ formId, renderedAt }: { formId: string; renderedAt
   return (
     <div className="flex flex-col gap-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
+        {/* On a phone the five tabs are wider than the screen, so they scroll on their own. */}
         <Tabs
           value={status}
           onValueChange={(value) => update({ filter: { ...state.filter, status: value } })}
+          className="max-w-full min-w-0 overflow-x-auto"
         >
           <TabsList aria-label="Entry status">
             {entryStatuses.map((value) => {

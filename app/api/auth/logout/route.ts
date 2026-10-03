@@ -8,12 +8,13 @@ export async function POST(request: Request) {
   const session = await getSession()
 
   if (session) {
-    // A token another request already refreshed is no longer valid, so there's nothing to revoke.
+    // If another request already refreshed this token, The Backend no longer accepts it, but the
+    // token that refresh produced is live (and may be in the browser's cookie by now). Revoke that.
     const refreshed = await refreshCoordinator()
-      .wasRefreshed(session.token)
-      .catch(() => false)
+      .refreshedTo(session.token)
+      .catch(() => null) // Store unreachable: revoke the token we have.
 
-    if (!refreshed) await logout(session.token, clientIp(request.headers))
+    await logout(refreshed?.token ?? session.token, clientIp(request.headers))
   }
 
   await clearSession()

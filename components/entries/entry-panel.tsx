@@ -172,13 +172,15 @@ export function EntryPanel({
 
   /** Moves through the list, loading the page before or after this one at its edges. */
   async function move(direction: -1 | 1) {
+    if (moving) return
+
     const adjacent = direction === 1 ? neighbours.next : neighbours.previous
 
     if (adjacent) return goTo(adjacent.id)
 
     const page = currentPage + direction
 
-    if (page < 1 || page > lastPage || moving) return
+    if (page < 1 || page > lastPage) return
 
     setMoving(true)
 
@@ -227,7 +229,11 @@ export function EntryPanel({
 
   const leave = () => (onClose ? onClose() : router.push(listHref))
 
+  // Buttons show `aria-disabled` while an action runs, not `disabled`: a disabled button loses
+  // keyboard focus, so this ignores presses instead.
   async function run(name: string, action: () => Promise<unknown>) {
+    if (busy !== undefined) return
+
     setBusy(name)
     await action()
     setBusy(undefined)
@@ -277,7 +283,8 @@ export function EntryPanel({
               size="icon-sm"
               aria-label="Previous entry"
               aria-keyshortcuts="k"
-              disabled={!hasPrevious || moving}
+              disabled={!hasPrevious}
+              aria-disabled={moving}
               onClick={() => void move(-1)}
             >
               <ChevronUp aria-hidden />
@@ -287,7 +294,8 @@ export function EntryPanel({
               size="icon-sm"
               aria-label="Next entry"
               aria-keyshortcuts="j"
-              disabled={!hasNext || moving}
+              disabled={!hasNext}
+              aria-disabled={moving}
               onClick={() => void move(1)}
             >
               <ChevronDown aria-hidden />
@@ -307,7 +315,7 @@ export function EntryPanel({
                 variant="outline"
                 size="sm"
                 aria-pressed={entry.starred}
-                disabled={busy !== undefined}
+                aria-disabled={busy !== undefined}
                 onClick={() => void change(entry, 'star', { starred: !entry.starred })}
               >
                 <Star aria-hidden className={cn(entry.starred && 'fill-current text-amber-500')} />
@@ -317,7 +325,7 @@ export function EntryPanel({
                 <Button
                   variant="outline"
                   size="sm"
-                  disabled={busy !== undefined}
+                  aria-disabled={busy !== undefined}
                   onClick={() => {
                     // Don't mark it read again while it's still open.
                     markedRead.current.add(entry.id)
@@ -331,7 +339,7 @@ export function EntryPanel({
                 <Button
                   variant="outline"
                   size="sm"
-                  disabled={busy !== undefined}
+                  aria-disabled={busy !== undefined}
                   onClick={() =>
                     void change(
                       entry,
@@ -348,7 +356,7 @@ export function EntryPanel({
               <Button
                 variant="outline"
                 size="sm"
-                disabled={busy !== undefined}
+                aria-disabled={busy !== undefined}
                 onClick={() =>
                   void change(
                     entry,
@@ -365,7 +373,7 @@ export function EntryPanel({
                 variant="destructive"
                 size="sm"
                 className="ms-auto"
-                disabled={busy !== undefined}
+                aria-disabled={busy !== undefined}
                 onClick={() =>
                   void run('delete', async () => {
                     if (await actions.remove(entry.id)) leave()
@@ -381,7 +389,7 @@ export function EntryPanel({
               <Button
                 variant="outline"
                 size="sm"
-                disabled={busy !== undefined}
+                aria-disabled={busy !== undefined}
                 onClick={() =>
                   void run('restore', async () => {
                     if (await actions.restore(entry.id)) leave()
@@ -395,7 +403,7 @@ export function EntryPanel({
                 variant="destructive"
                 size="sm"
                 className="ms-auto"
-                disabled={busy !== undefined}
+                aria-disabled={busy !== undefined}
                 onClick={() => void forceDelete(entry.id)}
               >
                 <Trash aria-hidden />

@@ -1,6 +1,6 @@
 # PRD: App Shell & Architecture
 
-**Status:** Partly built. Milestone 1 (2026-10-02): configuration (FR-1), generated types (FR-2), tooling. Milestone 2 (2026-10-02): the backend boundary (FR-3), proxy (FR-4, FR-5), layouts and navigation (FR-7), validation errors (FR-12), basic error pages (FR-13), and the mock backend's auth endpoints with the contract suite passing against it (FR-15). Milestone 3 (2026-10-02): TanStack Query data fetching with server prefetch (FR-6), form tabs (FR-8), toasts with Undo (FR-10), the 403 page (FR-13), and the mock backend's form endpoints. Milestone 5 (2026-10-02): `useConfirm` for permanent deletes (FR-11), and row selection in `DataTable`. Planned: polish (9), and the full mock-backend run (10)
+**Status:** Partly built. Milestone 1 (2026-10-02): configuration (FR-1), generated types (FR-2), tooling. Milestone 2 (2026-10-02): the backend boundary (FR-3), proxy (FR-4, FR-5), layouts and navigation (FR-7), validation errors (FR-12), basic error pages (FR-13), and the mock backend's auth endpoints with the contract suite passing against it (FR-15). Milestone 3 (2026-10-02): TanStack Query data fetching with server prefetch (FR-6), form tabs (FR-8), toasts with Undo (FR-10), the 403 page (FR-13), and the mock backend's form endpoints. Milestone 5 (2026-10-02): `useConfirm` for permanent deletes (FR-11), and row selection in `DataTable`. Milestone 9 (2026-10-03): `loading.tsx` skeletons (FR-9), the dashboard error page and Retry (FR-13), and the accessibility scan with its fixes (NFR-4, NFR-5). Planned: the full mock-backend run (10)
 
 ## 1. Summary
 
@@ -91,6 +91,8 @@ This PRD covers the foundation every feature builds on:
 - The first render of each page has its data (FR-6). Route segments have `loading.tsx` skeletons for navigations that aren't prefetched.
 - After that, tables show a loading bar while refetching, and the entry slide-over (when opened from a link) and the Exports popover show skeletons.
 - Buttons that trigger a change show a loading state and are disabled until the request settles, which prevents double submission.
+- **As built (milestone 9):** `loading.tsx` (`components/shared/page-skeleton.tsx`) on the forms list, Exports, Account, and the Entries and Notifications tabs, the routes that fetch while rendering. The forms list's page moved into a `forms/(list)/` route group, so its skeleton doesn't wrap `[formId]/`. The other tabs render from the form the layout already has, so they need none. List filters, sorts and pages change the URL shallowly (nuqs), so they don't show the skeleton; tables dim instead.
+- **Trade-off:** a skeleton starts streaming the response, which fixes its status at 200. So no `loading.tsx` sits above `[formId]/layout.tsx`, which keeps a missing form's 404 and a foreign form's 403 status. The full entry page, below the Entries skeleton, answers 200 for an entry it can't show, with the not-found page as its content.
 
 **FR-10 Toasts.**
 
@@ -108,6 +110,7 @@ This PRD covers the foundation every feature builds on:
 - Server Components translate a `BackendError` 404 into `notFound()` and a 403 into `forbidden()`.
 - **As built (milestone 3):** `forbidden()` needs Next's experimental `authInterrupts` flag. It's used because `error.tsx` only receives a digest in production, so it can't tell a 403 from any other error. `app/(dashboard)/forms/` has its own `not-found.tsx` and `forbidden.tsx`, so a missing or foreign form renders inside the dashboard shell.
 - A 401 at any point sends the user to `/login?next=<current path>`.
+- **As built (milestone 9):** `app/(dashboard)/error.tsx` re-exports `app/error.tsx`, so a dashboard page that fails keeps the sidebar. Both error pages call Next 16.3's `retry()`, which renders the page again from the server; `reset()`, used until then, only re-rendered what had failed, so it couldn't recover from a server error. A missing or foreign form's page is titled "Not found" or "No access": `generateMetadata` uses `loadForm`, which returns the status instead of calling `notFound()`, which had left the page with no `<title>`.
 
 **FR-14 Rate limiting.** A 429 shows The Backend's message, without retrying automatically.
 
@@ -132,7 +135,17 @@ This PRD covers the foundation every feature builds on:
   - Colour isn't the only signal for state (read/unread, spam, errors).
   - Text meets WCAG AA contrast in light and dark mode. **Lesson from Nuxt:** the UI library's default muted text, placeholders and subtle badges failed contrast; check the shadcn theme tokens the same way and adjust them in `globals.css`.
   - Checked by `tests/e2e/accessibility.spec.ts`: an axe scan (WCAG 2.1 A/AA) of every screen in both modes and at 375 px, keyboard-only navigation of the layout, and dialog focus. `<html>` has a `lang`.
+  - **As built (milestone 9):** the scan found, and these were fixed:
+    - destructive buttons' red text at 4:1 on their own tint in light mode (`--destructive` is now Tailwind's red-700 instead of red-600);
+    - the new-form template cards (radio buttons) had no accessible name, so they now name themselves after the template's title and description;
+    - links inside sentences (Integrate, the Exports popover) were set apart by colour alone, so they're now underlined;
+    - the not-found page for a form had no `<title>` (FR-13).
+  - The keyboard checks found three more problems:
+    - **Lost focus in tables.** TanStack's `FlexRender` passes a cell function to `createElement`, so a column list built during a render gives every cell a new component type and remounts it, and a checkbox toggled with Space or a star pressed with Enter lost focus. `DataTable` now calls the function itself, inside one stable component, which fixes every table at once.
+    - **Lost focus after dialogs.** Radix returns focus only to a `…Trigger`, and most dialogs here open from state, so focus fell to the page body when they closed. `useReturnFocus` in the dialog, alert dialog and sheet wrappers returns it to whatever had it. A dialog that starts on a field focuses it from `onOpenAutoFocus`: with `autoFocus`, Radix sees focus already inside and never reports the opening.
+    - **Phone sidebar.** It stayed open over the next page after following a link, and now closes.
 - **NFR-5 Responsiveness:** usable down to 375 px wide. Wide tables scroll horizontally inside their container, never the whole page.
+  - **As built (milestone 9):** the Entries status tabs were 392 px wide at 375 px, so the page scrolled sideways; they now scroll inside their own container.
 - **NFR-6 Theming:** light and dark mode with `next-themes`, without a flash of the wrong theme on load. Primary colour indigo, neutral zinc, to match the Nuxt dashboard.
 - **NFR-7 Independence:** no file outside `lib/backend/`, `.env.example` and the README names a backend framework.
 

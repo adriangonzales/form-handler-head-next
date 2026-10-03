@@ -50,17 +50,26 @@ export async function fetchFormNames(): Promise<Record<string, string> | null> {
 }
 
 /**
- * One form, or the not-found (404) or access-denied (403) page. Cached for the request, so a layout
- * and its metadata share one call.
+ * One form, or the status The Backend refused it with: 404 (deleted or unknown) or 403 (someone
+ * else's). Cached for the request, so a layout and its metadata share one call.
  */
-export const fetchForm = cache(async (id: string): Promise<Form> => {
+export const loadForm = cache(async (id: string): Promise<Form | 403 | 404> => {
   const { data, error, response } = await renderCall((options) =>
     backendClient(options).GET('/v1/forms/{form}', { params: { path: { form: id } } }),
   )
 
-  if (response.status === 404) notFound()
-  if (response.status === 403) forbidden()
+  if (response.status === 404 || response.status === 403) return response.status
   if (!data) throw backendErrorFrom(response, error)
 
   return data.data
 })
+
+/** One form, or the not-found (404) or access-denied (403) page. */
+export async function fetchForm(id: string): Promise<Form> {
+  const form = await loadForm(id)
+
+  if (form === 404) notFound()
+  if (form === 403) forbidden()
+
+  return form
+}

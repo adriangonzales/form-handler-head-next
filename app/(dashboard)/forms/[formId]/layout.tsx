@@ -2,16 +2,20 @@ import { dehydrate, HydrationBoundary } from '@tanstack/react-query'
 import type { Metadata } from 'next'
 import { FormHeader } from '@/components/forms/form-header'
 import { FormTabs } from '@/components/forms/form-tabs'
-import { fetchForm } from '@/lib/backend/forms'
+import { fetchForm, loadForm } from '@/lib/backend/forms'
 import { makeQueryClient } from '@/lib/query-client'
 import { queryKeys } from '@/lib/query-keys'
 
 export async function generateMetadata({
   params,
 }: LayoutProps<'/forms/[formId]'>): Promise<Metadata> {
-  const { name } = await fetchForm((await params).formId)
+  const form = await loadForm((await params).formId)
 
-  return { title: name }
+  // The layout shows the not-found or access-denied page; this only names it.
+  if (form === 404) return { title: 'Not found' }
+  if (form === 403) return { title: 'No access' }
+
+  return { title: form.name }
 }
 
 /**

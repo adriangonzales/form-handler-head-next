@@ -248,7 +248,10 @@ function DeliveryCell({ notification: { type, error } }: { notification: FormNot
   )
 }
 
-/** The Enabled switch. It's disabled while its own update is saving, so clicks can't race. */
+/**
+ * The Enabled switch. It ignores presses while its own update is saving, so they can't race. It's
+ * `aria-disabled` rather than `disabled` then, which would drop keyboard focus.
+ */
 function EnabledSwitch({ notification }: { notification: FormNotification }) {
   const { setEnabled } = useNotificationActions(notification.form_id)
   const saving = useMutationState({
@@ -264,9 +267,11 @@ function EnabledSwitch({ notification }: { notification: FormNotification }) {
   return (
     <Switch
       checked={notification.enabled}
-      disabled={saving > 0}
+      aria-disabled={saving > 0}
       aria-label={`Alerts for ${notification.value}`}
-      onCheckedChange={(enabled) => setEnabled.mutate({ notification, enabled })}
+      onCheckedChange={(enabled) => {
+        if (saving === 0) setEnabled.mutate({ notification, enabled })
+      }}
     />
   )
 }
