@@ -85,10 +85,10 @@ The behaviour is the same. These are the mechanisms that differ, and why.
 | PRDs and backend contract                                                                     | Written (milestone 0, 2026-10-02)                                                     |
 | Project scaffold, config from `.env`, generated API types, lint/format/typecheck/test tooling | Built (milestone 1, 2026-10-02)                                                       |
 | Backend boundary, login, session, token refresh, route protection, password reset             | Built (milestone 2, 2026-10-02)                                                       |
-| Form management                                                                               | Planned (milestone 3)                                                                 |
-| Schema builder, embed snippets, test submit                                                   | Planned (milestone 4)                                                                 |
-| Entry inbox and triage                                                                        | Planned (milestone 5)                                                                 |
-| CSV export                                                                                    | Planned (milestone 6)                                                                 |
+| Form management                                                                               | Built (milestone 3, 2026-10-02)                                                       |
+| Schema builder, embed snippets, test submit                                                   | Built (milestone 4, 2026-10-02)                                                       |
+| Entry inbox and triage                                                                        | Built (milestone 5, 2026-10-02)                                                       |
+| CSV export                                                                                    | Built (milestone 6, 2026-10-02)                                                       |
 | Notification recipients                                                                       | Planned (milestone 7)                                                                 |
 | Account self-service                                                                          | Planned (milestone 8)                                                                 |
 | Accessibility (WCAG 2.1 AA scan), end-to-end happy path, README                               | Planned (milestone 9)                                                                 |

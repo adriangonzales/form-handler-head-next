@@ -20,6 +20,15 @@ import {
   validateEntryUpdate,
   validateSubmission,
 } from './entries'
+import {
+  advanceExport,
+  exportParameters,
+  exportResource,
+  type MockExport,
+  newExport,
+  validateExportParameters,
+  validSignature,
+} from './exports'
 import { MockBackendState } from './state'
 import type { FormEntry } from '../../../types/models'
 
@@ -183,6 +192,53 @@ export function createMockBackend(options: {
     if (!form || form.user_id !== user.id || form.deleted_at !== null) return forbidden()
 
     return handle(entry)
+  }
+
+  const at = (ms?: number) => state.timestamp(ms)
+
+  /** Brings an export up to date with the time, and returns it as the resource. */
+  function exportOut(entryExport: MockExport) {
+    const now = state.options.now()
+
+    advanceExport(
+      entryExport,
+      state.forms.get(entryExport.form_id),
+      () => state.entriesOf(entryExport.form_id),
+      at,
+      now,
+    )
+
+    return exportResource(entryExport, {
+      apiUrl: options.apiUrl,
+      secret: state.signingSecret,
+      now,
+    })
+  }
+
+  /**
+   * Runs `handle` for an export of one of the signed-in user's forms: 401 for guests, 404 for
+   * unknown exports, and 403 for someone else's or those of a deleted form.
+   */
+  function withExport(
+    request: Request,
+    id: unknown,
+    handle: (entryExport: MockExport) => Response | Promise<Response>,
+  ) {
+    const user = state.authenticate(bearer(request))
+
+    if (!user) return unauthenticated()
+
+    const entryExport = state.exports.get(String(id).toLowerCase())
+
+    if (!entryExport) return notFound()
+
+    const form = state.forms.get(entryExport.form_id)
+
+    if (!form || form.user_id !== user.id || form.deleted_at !== null) {
+      return HttpResponse.json({ message: 'You do not own this form.' }, { status: 403 })
+    }
+
+    return handle(entryExport)
   }
 
   const handlers: RequestHandler[] = [
@@ -591,6 +647,88 @@ export function createMockBackend(options: {
           return new HttpResponse(null, { status: 204 })
         },
         { withTrashed: true },
+      ),
+    ),
+
+    // Exports: 202 with `Location`; the file is written in the background (see exportSteps).
+    http.post(`${api}/forms/:form/entries/exports`, ({ request, params }) =>
+      withForm(request, params.form, async (form) => {
+        const parameters = exportParameters(await jsonBody(request))
+        const errors = validateExportParameters(parameters)
+
+        if (Object.keys(errors).length > 0) return invalid(errors)
+
+        const entryExport = newExport(form, parameters, at, state.options.now())
+
+        state.exports.set(entryExport.id, entryExport)
+
+        return HttpResponse.json(
+          { data: exportOut(entryExport) },
+          { status: 202, headers: { Location: `${api}/entry-exports/${entryExport.id}` } },
+        )
+      }),
+    ),
+
+    // Newest first, leaving out expired exports and those of deleted forms.
+    http.get(`${api}/entry-exports`, ({ request }) => {
+      const user = state.authenticate(bearer(request))
+
+      if (!user) return unauthenticated()
+
+      const perPage = perPageFrom(request)
+
+      if (perPage instanceof Response) return perPage
+
+      const now = state.options.now()
+      const exports = [...state.exports.values()]
+        .filter((entryExport) => {
+          const form = state.forms.get(entryExport.form_id)
+
+          return (
+            form?.user_id === user.id &&
+            form.deleted_at === null &&
+            Date.parse(entryExport.expires_at) > now
+          )
+        })
+        .sort(
+          (a, b) =>
+            Date.parse(b.created_at!) - Date.parse(a.created_at!) || b.id.localeCompare(a.id),
+        )
+
+      return HttpResponse.json(paginate(request, exports.map(exportOut), perPage))
+    }),
+
+    http.get(`${api}/entry-exports/:export/download`, ({ request, params }) => {
+      const entryExport = state.exports.get(String(params.export).toLowerCase())
+      const now = state.options.now()
+
+      if (!validSignature(state.signingSecret, new URL(request.url), now)) {
+        return HttpResponse.json({ message: 'Invalid signature.' }, { status: 403 })
+      }
+
+      if (!entryExport) return notFound()
+
+      exportOut(entryExport)
+
+      if (Date.parse(entryExport.expires_at) <= now) {
+        return HttpResponse.json({ message: 'This export has expired.' }, { status: 410 })
+      }
+
+      if (entryExport.status !== 'completed' || entryExport.csv === null) {
+        return HttpResponse.json({ message: 'This export is not ready.' }, { status: 409 })
+      }
+
+      return new HttpResponse(entryExport.csv, {
+        headers: {
+          'Content-Type': 'text/csv; charset=UTF-8',
+          'Content-Disposition': `attachment; filename=${entryExport.filename}`,
+        },
+      })
+    }),
+
+    http.get(`${api}/entry-exports/:export`, ({ request, params }) =>
+      withExport(request, params.export, (entryExport) =>
+        HttpResponse.json({ data: exportOut(entryExport) }),
       ),
     ),
 

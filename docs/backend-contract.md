@@ -145,9 +145,9 @@ _Relied on by `lib/entries/`._
 
 ## Exports
 
-_Relied on by `lib/exports/`, `hooks/useExportPolling.ts`, `hooks/useExportActions.ts`._
+_Relied on by `lib/exports/`, `hooks/use-exports-watcher.ts`, `hooks/use-export-actions.ts`._
 
-- `POST /v1/forms/{form}/entries/exports` takes the entries list's `filter` and `sort` (and ignores `per_page`) → 202 with the export resource.
+- `POST /v1/forms/{form}/entries/exports` takes the entries list's `filter` and `sort` (and ignores `per_page`) → 202 with the export resource and a `Location` header. Invalid filters → 422 as on the entries list.
 - `status` moves `pending` → `processing` → `completed` | `failed`, with `error` set on failure. Processing happens in the background.
 - `parameters` is the `{ filter?, sort? }` object the export was created with (`{}` when empty).
 - `download_url` is `null` until `completed`, then an **absolute, signed URL that needs no bearer token**, valid for a few minutes from the response that carried it (5 in the reference implementation). Fetching the export again gives a fresh one.

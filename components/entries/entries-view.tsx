@@ -52,6 +52,7 @@ import { cn } from '@/lib/utils'
 import type { FormEntry, FormEntryBulkAction } from '@/types/models'
 import { EntryBulkBar } from './entry-bulk-bar'
 import { EntryDateFilter } from './entry-date-filter'
+import { ExportButton } from './export-button'
 
 const noEntries: FormEntry[] = []
 
@@ -334,6 +335,7 @@ export function EntriesView({ formId, renderedAt }: { formId: string; renderedAt
               ))}
             </SelectContent>
           </Select>
+          <ExportButton formId={formId} apiQuery={apiQuery} />
         </div>
       </div>
 

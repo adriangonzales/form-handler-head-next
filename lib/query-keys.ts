@@ -10,6 +10,8 @@ export const queryKeys = {
     lists: () => [...queryKeys.forms.all, 'list'] as const,
     list: (query: ApiQuery) => [...queryKeys.forms.lists(), query] as const,
     detail: (id: string) => [...queryKeys.forms.all, 'detail', id] as const,
+    /** Every form's name by ID, for exports, which only carry `form_id`. */
+    names: () => [...queryKeys.forms.all, 'names'] as const,
   },
   entries: {
     all: ['entries'] as const,
@@ -23,5 +25,10 @@ export const queryKeys = {
     counts: (formId: string) => [...queryKeys.entries.form(formId), 'counts'] as const,
     detail: (formId: string, id: string) =>
       [...queryKeys.entries.form(formId), 'detail', id] as const,
+  },
+  exports: {
+    all: ['exports'] as const,
+    lists: () => [...queryKeys.exports.all, 'list'] as const,
+    list: (query: ApiQuery) => [...queryKeys.exports.lists(), query] as const,
   },
 }

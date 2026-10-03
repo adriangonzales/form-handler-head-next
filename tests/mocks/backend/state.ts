@@ -1,5 +1,6 @@
 import { randomBytes } from 'node:crypto'
 import type { FormEntry, User } from '../../../types/models'
+import { type MockExport, signingSecret } from './exports'
 import type { MockForm } from './forms'
 
 interface MockUser extends User {
@@ -30,6 +31,10 @@ export class MockBackendState {
   readonly forms = new Map<string, MockForm>()
   /** Every entry, including soft-deleted ones, by ID. */
   readonly entries = new Map<string, FormEntry>()
+  /** Every export, by ID. */
+  readonly exports = new Map<string, MockExport>()
+  /** Signs export download links. */
+  readonly signingSecret = signingSecret()
 
   constructor(readonly options: MockBackendOptions) {}
 
@@ -68,6 +73,10 @@ export class MockBackendState {
 
       for (const [entryId, entry] of this.entries) {
         if (entry.form_id === formId) this.entries.delete(entryId)
+      }
+
+      for (const [exportId, entryExport] of this.exports) {
+        if (entryExport.form_id === formId) this.exports.delete(exportId)
       }
     }
 
@@ -127,9 +136,9 @@ export class MockBackendState {
     return [...this.entries.values()].filter((entry) => entry.form_id === formId)
   }
 
-  /** The current time as the contract's ISO 8601 UTC string. */
-  timestamp(): string {
-    return new Date(this.options.now()).toISOString().replace(/\.(\d{3})Z$/, '.$1000Z')
+  /** The current time, or `ms`, as the contract's ISO 8601 UTC string. */
+  timestamp(ms = this.options.now()): string {
+    return new Date(ms).toISOString().replace(/\.(\d{3})Z$/, '.$1000Z')
   }
 
   checkPassword(userId: number, password: string): boolean {

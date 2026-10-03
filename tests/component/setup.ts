@@ -11,6 +11,8 @@ globalThis.ResizeObserver ??= class {
 }
 Element.prototype.scrollIntoView ??= () => {}
 Element.prototype.hasPointerCapture ??= () => false
+Element.prototype.setPointerCapture ??= () => {}
+Element.prototype.releasePointerCapture ??= () => {}
 
 beforeAll(() => server.listen({ onUnhandledFrame: 'error' }))
 afterEach(() => {

@@ -1,6 +1,6 @@
 # PRD: Entries
 
-**Status:** Built (milestone 5, 2026-10-02; Export CSV comes with milestone 6) · **Owner area:** `app/(dashboard)/forms/[formId]/entries/layout.tsx`, `…/entries/page.tsx`, `…/entries/@detail/(.)[entryId]/page.tsx`, `…/entries/@detail/page.tsx`, `…/entries/@detail/default.tsx`, `…/entries/[entryId]/page.tsx`, `components/entries/*` (`entries-view`, `entry-date-filter`, `entry-bulk-bar`, `entry-panel`, `entry-detail`, `entry-sheet`, `entry-page`), `lib/entries/*` (`entries.ts`, `queries.ts`, `dates.ts`), `lib/config.ts`, `hooks/use-entry-actions.ts`, `hooks/use-now.ts`
+**Status:** Built (milestone 5, 2026-10-02; Export CSV in milestone 6) · **Owner area:** `app/(dashboard)/forms/[formId]/entries/layout.tsx`, `…/entries/page.tsx`, `…/entries/@detail/(.)[entryId]/page.tsx`, `…/entries/@detail/page.tsx`, `…/entries/@detail/default.tsx`, `…/entries/[entryId]/page.tsx`, `components/entries/*` (`entries-view`, `entry-date-filter`, `entry-bulk-bar`, `entry-panel`, `entry-detail`, `entry-sheet`, `entry-page`), `lib/entries/*` (`entries.ts`, `queries.ts`, `dates.ts`), `lib/config.ts`, `hooks/use-entry-actions.ts`, `hooks/use-now.ts`
 
 ## 1. Summary
 

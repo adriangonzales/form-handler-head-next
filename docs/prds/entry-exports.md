@@ -1,6 +1,6 @@
 # PRD: Entry Exports
 
-**Status:** Planned (milestone 6) · **Owner area:** `components/entries/ExportButton.tsx`, `components/exports/*` (`ExportList`, `ExportStatus`, `ExportActions`), `app/(dashboard)/exports/page.tsx`, `hooks/useExportPolling.ts`, `hooks/useExportActions.ts`, `lib/exports/*`
+**Status:** Built (milestone 6, 2026-10-02) · **Owner area:** `components/entries/export-button.tsx`, `components/exports/*` (`export-list`, `export-status`, `export-actions`, `exports-table`, `exports-watcher`), `app/(dashboard)/exports/page.tsx`, `hooks/use-exports-watcher.ts`, `hooks/use-export-actions.ts`, `lib/exports/*`, `lib/backend/exports.ts`
 
 ## 1. Summary
 
@@ -29,7 +29,7 @@ Exports are kept for 24 hours, and The Backend lists them. Recent exports can th
 
 **FR-2 Poll status.**
 
-- `useExportPolling` polls `GET /v1/entry-exports/{export}` for each `pending` or `processing` export on screen: every 2 s, backing off to every 10 s after 30 s, until `status` is `completed` or `failed`. Polling pauses while the browser tab is hidden.
+- `useExportsWatcher` (mounted once in the dashboard layout) polls `GET /v1/entry-exports/{export}` for each `pending` or `processing` export in any loaded list: every 2 s, backing off to every 10 s after 30 s, until `status` is `completed` or `failed`. Polling pauses while the browser tab is hidden.
 - Polling stops when no in-progress export is on screen. Because the index (FR-6, FR-7) always shows the current state, an export started elsewhere, or before a reload, is picked up again from there. Nothing needs to be kept in browser storage.
 - While polling, the row shows `pending` / `processing`.
 - An export started from the Entries tab that finishes while the popover is closed announces itself with an "Export ready" toast with **Download**.

@@ -1,5 +1,6 @@
 'use client'
 
+import { useQuery } from '@tanstack/react-query'
 import { CircleUser, Download, FileText, Inbox, LogOut, Moon, Sun, User } from 'lucide-react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
@@ -21,10 +22,13 @@ import {
   SidebarGroupContent,
   SidebarHeader,
   SidebarMenu,
+  SidebarMenuBadge,
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarRail,
 } from '@/components/ui/sidebar'
+import { isInProgress } from '@/lib/exports/exports'
+import { exportsListQuery, recentExportsQuery } from '@/lib/exports/queries'
 import { loginUrl } from '@/lib/redirect'
 import type { User as SessionUser } from '@/types/models'
 
@@ -43,6 +47,9 @@ export function AppSidebar({ user }: { user: Pick<SessionUser, 'name' | 'email'>
   const pathname = usePathname()
   const { resolvedTheme, setTheme } = useTheme()
   const dark = resolvedTheme === 'dark'
+  // The dashboard's exports watcher loads and polls these.
+  const { data: recentExports } = useQuery(exportsListQuery(recentExportsQuery))
+  const exportsInProgress = recentExports?.data.filter(isInProgress).length ?? 0
 
   return (
     <Sidebar collapsible="icon">
@@ -65,6 +72,7 @@ export function AppSidebar({ user }: { user: Pick<SessionUser, 'name' | 'email'>
             <SidebarMenu>
               {navigation.map(({ label, href, icon: Icon }) => {
                 const active = pathname === href || pathname.startsWith(`${href}/`)
+                const badge = href === '/exports' ? exportsInProgress : 0
 
                 return (
                   <SidebarMenuItem key={href}>
@@ -72,8 +80,16 @@ export function AppSidebar({ user }: { user: Pick<SessionUser, 'name' | 'email'>
                       <Link href={href} aria-current={active ? 'page' : undefined}>
                         <Icon aria-hidden />
                         <span>{label}</span>
+                        {badge > 0 && <span className="sr-only">, {badge} in progress</span>}
                       </Link>
                     </SidebarMenuButton>
+                    {badge > 0 && (
+                      <SidebarMenuBadge aria-hidden>
+                        <span className="rounded-md bg-primary px-1.5 text-primary-foreground">
+                          {badge}
+                        </span>
+                      </SidebarMenuBadge>
+                    )}
                   </SidebarMenuItem>
                 )
               })}

@@ -1,4 +1,5 @@
 import { cookies } from 'next/headers'
+import { ExportsWatcher } from '@/components/exports/exports-watcher'
 import { AppSidebar } from '@/components/layout/app-sidebar'
 import { Separator } from '@/components/ui/separator'
 import { SidebarInset, SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar'
@@ -11,6 +12,7 @@ export default async function DashboardLayout({ children }: LayoutProps<'/'>) {
 
   return (
     <SidebarProvider defaultOpen={sidebarOpen}>
+      <ExportsWatcher />
       <AppSidebar user={{ name: user.name, email: user.email }} />
       <SidebarInset>
         <header className="flex h-12 items-center gap-2 border-b px-4">

@@ -610,3 +610,190 @@ describe.skipIf(!canCreateUsers)('entries', () => {
     expect(Object.keys(response.body.errors)).toContain('filter.created_to')
   })
 })
+
+describe.skipIf(!canCreateUsers)('exports', () => {
+  let account: Account
+  let token: string
+  let formId: string
+  /** Every export this suite started, newest last. */
+  const started: string[] = []
+
+  const createForm = async (name: string) => {
+    const form = await call('/v1/forms', {
+      method: 'POST',
+      token,
+      body: JSON.stringify({
+        name,
+        schema: [
+          { id: '01k0000000000000000000000a', order: 2, label: 'Your message', name: 'message' },
+          { id: '01k0000000000000000000000b', order: 1, label: 'Full name', name: 'name' },
+        ],
+      }),
+    })
+
+    await call(`/v1/forms/${form.body.data.id}`, {
+      method: 'PUT',
+      token,
+      body: JSON.stringify({ name, active: true }),
+    })
+
+    return form.body.data.id as string
+  }
+
+  const startExport = async (form: string, body: Record<string, unknown>) => {
+    const response = await call(`/v1/forms/${form}/entries/exports`, {
+      method: 'POST',
+      token,
+      body: JSON.stringify(body),
+    })
+
+    if (response.status === 202) started.push(response.body.data.id)
+
+    return response
+  }
+
+  /** Polls an export until it's no longer in progress. Needs The Backend's workers running. */
+  async function settled(id: string) {
+    const deadline = Date.now() + 30_000
+
+    for (;;) {
+      const { body } = await call(`/v1/entry-exports/${id}`, { token })
+
+      if (!['pending', 'processing'].includes(body.data.status)) return body.data
+
+      if (Date.now() > deadline) {
+        throw new Error(`Export ${id} is still ${body.data.status}: are the workers running?`)
+      }
+
+      await new Promise((resolve) => setTimeout(resolve, 500))
+    }
+  }
+
+  beforeAll(async () => {
+    account = createThrowawayUser('Contract')
+    token = (
+      await call('/v1/auth/login', {
+        method: 'POST',
+        body: JSON.stringify({ email: account.email, password: account.password }),
+      })
+    ).body.access_token
+    formId = await createForm('Contract Exports')
+
+    for (const [name, message, starred] of [
+      ['Ana', 'First', true],
+      ['Bo', 'Second', false],
+      ['Cy', '=1+1', true],
+    ] as const) {
+      const entry = await call(`/v1/forms/${formId}/entries`, {
+        method: 'POST',
+        token,
+        body: JSON.stringify({ name, message }),
+      })
+
+      if (starred) {
+        await call(`/v1/entries/${entry.body.data.id}`, {
+          method: 'PUT',
+          token,
+          body: JSON.stringify({ starred: true }),
+        })
+      }
+    }
+  })
+
+  afterAll(async () => {
+    if (token) {
+      await call(`/v1/auth/me?password=${encodeURIComponent(account.password)}`, {
+        method: 'DELETE',
+        token,
+      })
+    }
+  })
+
+  it('starts an export with 202 and Location, keeping filter and sort but not per_page', async () => {
+    const response = await startExport(formId, {
+      filter: { starred: 'true' },
+      sort: '-created_at',
+      per_page: 5,
+    })
+    const entryExport = response.body.data
+
+    expect(response.status).toBe(202)
+    expect(response.headers.get('location')).toMatch(
+      new RegExp(`/v1/entry-exports/${entryExport.id}$`),
+    )
+    expect(entryExport).toMatchObject({
+      form_id: formId,
+      status: expect.stringMatching(/^(pending|processing|completed)$/),
+      parameters: { filter: { starred: 'true' }, sort: '-created_at' },
+      filename: expect.stringMatching(/^contract-exports-entries-\d{4}-\d{2}-\d{2}\.csv$/),
+    })
+    expect(entryExport.parameters).not.toHaveProperty('per_page')
+    expect(Date.parse(entryExport.expires_at) - Date.parse(entryExport.created_at)).toBe(
+      24 * 3600 * 1000,
+    )
+
+    if (entryExport.status !== 'completed') expect(entryExport.download_url).toBeNull()
+  })
+
+  it('returns `{}` as the parameters of an export without filters, and rejects bad filters', async () => {
+    const plain = await startExport(formId, {})
+    const invalid = await startExport(formId, { filter: { spam: 'maybe' } })
+
+    expect(plain.body.data.parameters).toEqual({})
+    expect(invalid.status).toBe(422)
+    expect(Object.keys(invalid.body.errors)).toContain('filter.spam')
+  })
+
+  it('lists exports newest first, with per_page bounds, and answers 404 for an unknown one', async () => {
+    const index = await call('/v1/entry-exports', { token })
+
+    expect(index.status).toBe(200)
+    expect(index.body.data.map((row: { id: string }) => row.id)).toEqual([...started].reverse())
+    expect(index.body.meta).toMatchObject({ current_page: 1, per_page: 15 })
+    expect((await call('/v1/entry-exports?per_page=101', { token })).status).toBe(422)
+    expect((await call(`/v1/entry-exports/${madeUpUlid}`, { token })).status).toBe(404)
+  })
+
+  it('completes with a signed link that downloads the CSV without a token', async () => {
+    const entryExport = await settled(started[0]!)
+
+    expect(entryExport).toMatchObject({
+      status: 'completed',
+      row_count: 2,
+      completed_at: expect.any(String),
+      error: null,
+    })
+    expect(entryExport.download_url).toMatch(/^https?:\/\//)
+
+    const download = await fetch(entryExport.download_url)
+    const csv = await download.text()
+    const lines = csv.trim().split(/\r?\n/)
+
+    expect(download.status).toBe(200)
+    expect(download.headers.get('content-type')).toMatch(/^text\/csv/)
+    expect(download.headers.get('content-disposition')).toContain(entryExport.filename)
+    // Schema fields in order, headed by their labels.
+    expect(lines[0]).toMatch(/^id,created_at,"Full name","Your message",read_at,starred,spam,/)
+    expect(lines[0]).toContain('spam_checked_at')
+    expect(lines).toHaveLength(3)
+    // Newest first, and formula-like cells are neutralised.
+    expect(lines[1]).toContain(`'=1+1`)
+    expect(lines[2]).toContain('First')
+
+    const tampered = new URL(entryExport.download_url)
+
+    tampered.searchParams.set('signature', 'x'.repeat(64))
+    expect((await fetch(tampered)).status).toBe(403)
+  })
+
+  it('leaves exports of a deleted form out of the index', async () => {
+    const other = await createForm('Contract Gone')
+    const gone = (await startExport(other, {})).body.data.id
+
+    await call(`/v1/forms/${other}`, { method: 'DELETE', token })
+
+    const index = await call('/v1/entry-exports?per_page=100', { token })
+
+    expect(index.body.data.map((row: { id: string }) => row.id)).not.toContain(gone)
+  })
+})

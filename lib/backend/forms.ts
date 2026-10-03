@@ -27,6 +27,29 @@ export async function fetchFormsPage(query: ApiQuery): Promise<Paginated<FormLis
 }
 
 /**
+ * Every form's name by ID (up to 1000 forms), for lists of exports, which only carry `form_id`.
+ * Resolves `null` when The Backend fails; the browser then loads the names itself.
+ */
+export async function fetchFormNames(): Promise<Record<string, string> | null> {
+  const names: Record<string, string> = {}
+  let page = 1
+  let lastPage = 1
+
+  do {
+    const result = await fetchFormsPage({ page, per_page: 100, sort: 'name' })
+
+    if (!result) return null
+
+    for (const form of result.data) names[form.id] = form.name
+
+    lastPage = result.meta.last_page
+    page += 1
+  } while (page <= Math.min(lastPage, 10))
+
+  return names
+}
+
+/**
  * One form, or the not-found (404) or access-denied (403) page. Cached for the request, so a layout
  * and its metadata share one call.
  */
